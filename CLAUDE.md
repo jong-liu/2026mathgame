@@ -16,7 +16,7 @@
 
 ## 工具清單
 （之後加新工具時會自動更新）
-- （尚無）
+- **三角形獵人** `tools/triangle-congruence/` — 三角形全等判定闖關遊戲（新手村→配對挑戰→證明迷宮→Boss會考），涵蓋 SSS/SAS/ASA/AAS/RHS + SSA/AAA 陷阱。網址：https://jong-liu.github.io/2026mathgame/tools/triangle-congruence/
 
 ## 工作注意事項
 - 學生資料一律去識別化（只用座號 + 班級代號）

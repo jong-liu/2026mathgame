@@ -137,6 +137,26 @@
   .review h3{margin:.2em 0;color:var(--accent-soft);font-size:1rem;}
   .review li{color:var(--chalk-dim);font-size:.9rem;margin:4px 0;}
 
+  /* 通關場景 + 煙火 */
+  .win-title{text-align:center;font-size:1.3rem;color:var(--accent);font-weight:bold;margin:0 0 12px;text-shadow:0 1px 0 rgba(0,0,0,.4);}
+  .scene-wrap{position:relative;max-width:760px;margin:0 auto;border-radius:14px;overflow:hidden;box-shadow:0 12px 36px rgba(0,0,0,.55);border:1px solid var(--line);}
+  .scene-wrap svg.scene{width:100%;height:auto;display:block;}
+  .fw-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+  .firework{position:absolute;width:0;height:0;}
+  .firework span{
+    position:absolute;left:0;top:0;width:5px;height:5px;border-radius:50%;
+    background:var(--fc);box-shadow:0 0 9px 2px var(--fc);opacity:0;
+    transform:rotate(var(--a)) translateY(0) scale(1);
+    animation:fwburst 1.9s ease-out infinite;animation-delay:var(--dl);
+  }
+  @keyframes fwburst{
+    0%,5%{transform:rotate(var(--a)) translateY(0) scale(.6);opacity:0;}
+    12%{opacity:1;}
+    55%{opacity:1;}
+    100%{transform:rotate(var(--a)) translateY(var(--d)) scale(.25);opacity:0;}
+  }
+  .win-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+
   /* 性質速覽 */
   details.ref{background:var(--board);border:1px solid var(--line);border-radius:12px;padding:4px 14px;margin-bottom:14px;}
   details.ref summary{cursor:pointer;font-weight:bold;color:var(--accent-soft);padding:6px 0;list-style:none;}
@@ -220,7 +240,7 @@ function triangleSVG(t,labels,marks){
   if(marks.right==="B")s+=drawRight(t.B,t.A,t.C);else s+=drawArc(t.B,t.A,t.C,marks.angles.B||0);
   if(marks.right==="C")s+=drawRight(t.C,t.A,t.B);else s+=drawArc(t.C,t.A,t.B,marks.angles.C||0);
   s+=vLabel(t.A,cen,labels[0])+vLabel(t.B,cen,labels[1])+vLabel(t.C,cen,labels[2]);
-  return`<svg viewBox="0 0 240 220">${s}</svg>`;
+  return`<svg viewBox="0 0 240 235">${s}</svg>`;
 }
 
 const SHAPE_GENERAL={A:[120,30],B:[34,176],C:[206,160]};
@@ -232,9 +252,17 @@ function buildMarks(q){
   q.angles.forEach((a,i)=>angles[a]=i+1);
   return{sides,angles,right:q.right};
 }
+function instq(src){
+  const q={...src};
+  if(q.shape==="R"){q.rot1=(Math.random()*2-1)*4;q.rot2=q.rot1+11+(Math.random()*2-1)*4;}
+  else{q.rot1=(Math.random()*2-1)*6;q.rot2=q.rot1-14+(Math.random()*2-1)*6;}
+  return q;
+}
 function pairHTML(q){
   const base=q.shape==="R"?SHAPE_RIGHT:SHAPE_GENERAL;
-  const t1=base,t2=rotTri(base,q.shape==="R"?14:-18),marks=buildMarks(q);
+  const r1=(q.rot1!==undefined)?q.rot1:0;
+  const r2=(q.rot2!==undefined)?q.rot2:(q.shape==="R"?14:-18);
+  const t1=rotTri(base,r1),t2=rotTri(base,r2),marks=buildMarks(q);
   return`<div class="tri-row">
     <div class="tri-box">${triangleSVG(t1,["A","B","C"],marks)}<div class="tri-name">△ABC</div></div>
     <div class="cong-sym">≅</div>
@@ -311,6 +339,18 @@ const state={
 };
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 
+// 開新的一輪：重設計分並重新抽各關卡題目（重玩會換題）
+function newRun(){
+  clearTimer();
+  state.shards=0;state.vIdx=0;state.mIdx=0;state.bossPart=0;state.stageIdx=0;
+  state.l1Time=60;state.l1Defeat=0;state.l1Wrong=0;
+  state.errorTally={SSS:0,SAS:0,ASA:0,AAS:0,RHS:0,NONE:0};
+  state.village=buildVillage();
+  state.maze=shuffle(MAZE_SCENARIOS)[0];
+  state.boss=shuffle(BOSS_SCENARIOS)[0];
+  state.bossAngle=[60,65,70,75,80][Math.floor(Math.random()*5)];
+}
+
 const $stage=document.getElementById("stage");
 function clearTimer(){if(state.timerId){clearInterval(state.timerId);state.timerId=null;}}
 
@@ -338,29 +378,30 @@ function renderStart(){
     <p class="prompt">你將依序闖過 <strong>新手村 → 配對挑戰 → 證明迷宮 → Boss 會考</strong>，<br>蒐集三角形碎片，最後拿下「三角形獵人徽章」。</p>
     <div class="controls"><button class="btn" id="go">開始狩獵 ▶</button></div>
   </div>`;
-  document.getElementById("go").onclick=()=>{state.stageIdx=0;renderVillage();};
+  document.getElementById("go").onclick=()=>{renderVillage();};
 }
 
 /* ================= 🟢 新手村 ================= */
-const VILLAGE=[ // 每個判定示範一題
-  BANK[0],BANK[1],BANK[3],BANK[5],BANK[7]
-];
-const VILLAGE_META=[
-  "後設思考：為什麼三邊相等，兩個三角形就一定能完全疊合？",
-  "後設思考：如果角不是夾在兩邊中間，還能用 SAS 嗎？",
-  "後設思考：邊夾在兩角之間，這條邊叫什麼？",
-  "後設思考：AAS 和 ASA 差在哪？關鍵在那條邊的位置。",
-  "後設思考：為什麼 RHS 只適用於直角三角形？"
-];
+const META_BY_RULE={
+  SSS:"後設思考：為什麼三邊相等，兩個三角形就一定能完全疊合？",
+  SAS:"後設思考：如果角不是夾在兩邊中間，還能用 SAS 嗎？",
+  ASA:"後設思考：邊夾在兩角之間，這條邊叫什麼？",
+  AAS:"後設思考：AAS 和 ASA 差在哪？關鍵在那條邊的位置。",
+  RHS:"後設思考：為什麼 RHS 只適用於直角三角形？"
+};
+// 依固定教學順序，但每課隨機抽該判定的不同變體（重玩會換題）
+function buildVillage(){
+  return ["SSS","SAS","ASA","AAS","RHS"].map(r=>instq(shuffle(BANK.filter(q=>q.rule===r))[0]));
+}
 function renderVillage(){
   clearTimer();state.screen="village";renderHUD();
-  const q=VILLAGE[state.vIdx];
+  const q=state.village[state.vIdx];
   $stage.innerHTML=`<div class="panel">
-    <p class="prompt">新手村 第 ${state.vIdx+1}/${VILLAGE.length} 課 —— 這組三角形<strong>符合哪個判定</strong>？</p>
+    <p class="prompt">新手村 第 ${state.vIdx+1}/${state.village.length} 課 —— 這組三角形<strong>符合哪個判定</strong>？</p>
     ${pairHTML(q)}
     ${answersHTML()}
     <div class="feedback" id="fb"></div>
-    <div class="meta">${VILLAGE_META[state.vIdx]}</div>
+    <div class="meta">${META_BY_RULE[q.rule]}</div>
     <div class="controls"><button class="btn hidden" id="next">收下碎片 ▶</button></div>
   </div>`;
   bindAnswers(q,(ok,chosen)=>{
@@ -376,7 +417,7 @@ function renderVillage(){
   });
   document.getElementById("next").onclick=()=>{
     state.vIdx++;
-    if(state.vIdx>=VILLAGE.length){state.stageIdx=1;renderLevel1Intro();}
+    if(state.vIdx>=state.village.length){state.stageIdx=1;renderLevel1Intro();}
     else renderVillage();
   };
 }
@@ -404,7 +445,7 @@ function startLevel1Timer(){
 }
 function nextLevel1(){
   state.screen="level1";renderHUD();
-  const q=shuffle(BANK)[0];state.l1Q=q;
+  const q=instq(shuffle(BANK)[0]);state.l1Q=q;
   $stage.innerHTML=`<div class="panel">
     <div class="monster" id="mon">👾</div>
     <p class="prompt">這組三角形依<strong>哪個性質</strong>全等？</p>
@@ -441,40 +482,66 @@ function renderLevel1Done(){
 }
 
 /* ================= 🔵 關卡二：證明迷宮 ================= */
-const MAZE_GIVEN="已知：AB ＝ DE，∠A ＝ ∠D，AC ＝ DF。　目標：證明 ∠B ＝ ∠E。";
-const MAZE=[
-  {q:"第一步，你應該先做什麼？",opts:[
-    {t:"直接寫下 ∠B ＝ ∠E",ok:false,hint:"還沒有根據，不能直接斷定。"},
-    {t:"先證明 △ABC ≅ △DEF",ok:true},
-    {t:"用量角器量出兩個角",ok:false,hint:"幾何證明靠推理，不靠測量。"}
+const MAZE_SCENARIOS=[
+  {given:"已知：AB ＝ DE，∠A ＝ ∠D，AC ＝ DF。　目標：證明 ∠B ＝ ∠E。",steps:[
+    {q:"第一步，你應該先做什麼？",opts:[
+      {t:"直接寫下 ∠B ＝ ∠E",ok:false,hint:"還沒有根據，不能直接斷定。"},
+      {t:"先證明 △ABC ≅ △DEF",ok:true},
+      {t:"用量角器量出兩個角",ok:false,hint:"幾何證明靠推理，不靠測量。"}]},
+    {q:"要用哪個判定來證明這兩個三角形全等？",opts:[
+      {t:"SSS（三邊相等）",ok:false,hint:"已知只有兩條邊，不是三條。"},
+      {t:"SAS（兩邊及夾角）",ok:true},
+      {t:"ASA（兩角及夾邊）",ok:false,hint:"∠A 是 AB、AC 的夾角，給的是『兩邊夾一角』。"}]},
+    {q:"證得全等後，憑什麼說 ∠B ＝ ∠E？",opts:[
+      {t:"因為全等三角形的對應角相等",ok:true},
+      {t:"因為全等三角形的對應邊相等",ok:false,hint:"∠B、∠E 是角，要用『對應角』相等。"},
+      {t:"因為它們是同位角",ok:false,hint:"圖中沒有平行線，談不上同位角。"}]}
   ]},
-  {q:"要用哪個判定來證明這兩個三角形全等？",opts:[
-    {t:"SSS（三邊相等）",ok:false,hint:"已知只有兩條邊，不是三條。"},
-    {t:"SAS（兩邊及夾角）",ok:true},
-    {t:"ASA（兩角及夾邊）",ok:false,hint:"∠A 是 AB、AC 的夾角，給的是『兩邊夾一角』。"}
+  {given:"已知：∠A ＝ ∠D，∠B ＝ ∠E，AB ＝ DE。　目標：證明 AC ＝ DF。",steps:[
+    {q:"第一步，你應該先做什麼？",opts:[
+      {t:"先證明 △ABC ≅ △DEF",ok:true},
+      {t:"直接寫下 AC ＝ DF",ok:false,hint:"還沒有根據，不能直接斷定。"},
+      {t:"先假設 AC ＝ DF 再驗證",ok:false,hint:"證明不能先假設結論成立。"}]},
+    {q:"要用哪個判定來證明這兩個三角形全等？",opts:[
+      {t:"ASA（兩角及夾邊）",ok:true},
+      {t:"AAS（兩角及非夾邊）",ok:false,hint:"AB 正好是 ∠A、∠B 的夾邊，應該是 ASA。"},
+      {t:"SAS（兩邊及夾角）",ok:false,hint:"已知只有一條邊，不是兩條。"}]},
+    {q:"證得全等後，憑什麼說 AC ＝ DF？",opts:[
+      {t:"因為全等三角形的對應邊相等",ok:true},
+      {t:"因為全等三角形的對應角相等",ok:false,hint:"AC、DF 是邊，要用『對應邊』相等。"},
+      {t:"因為它們是斜邊",ok:false,hint:"題目沒有直角，談不上斜邊。"}]}
   ]},
-  {q:"證得全等後，憑什麼說 ∠B ＝ ∠E？",opts:[
-    {t:"因為全等三角形的對應角相等",ok:true},
-    {t:"因為全等三角形的對應邊相等",ok:false,hint:"∠B、∠E 是角，要用『對應角』相等。"},
-    {t:"因為它們是同位角",ok:false,hint:"圖中沒有平行線，談不上同位角。"}
+  {given:"已知：AB ＝ DE，BC ＝ EF，CA ＝ FD。　目標：證明 ∠A ＝ ∠D。",steps:[
+    {q:"第一步，你應該先做什麼？",opts:[
+      {t:"先證明 △ABC ≅ △DEF",ok:true},
+      {t:"直接寫下 ∠A ＝ ∠D",ok:false,hint:"還沒有根據，不能直接斷定。"},
+      {t:"量出 ∠A 與 ∠D 來比較",ok:false,hint:"幾何證明靠推理，不靠測量。"}]},
+    {q:"要用哪個判定來證明這兩個三角形全等？",opts:[
+      {t:"SSS（三邊相等）",ok:true},
+      {t:"SAS（兩邊及夾角）",ok:false,hint:"題目給的是三條邊，沒有給角。"},
+      {t:"AAS（兩角及非夾邊）",ok:false,hint:"題目沒有給任何角。"}]},
+    {q:"證得全等後，憑什麼說 ∠A ＝ ∠D？",opts:[
+      {t:"因為全等三角形的對應角相等",ok:true},
+      {t:"因為全等三角形的對應邊相等",ok:false,hint:"∠A、∠D 是角，要用『對應角』相等。"},
+      {t:"因為三角形內角和 180°",ok:false,hint:"內角和不能直接推出兩角相等。"}]}
   ]}
 ];
 function renderLevel2(){
   clearTimer();state.screen="level2";renderHUD();
-  const step=MAZE[state.mIdx];
+  const steps=state.maze.steps,step=steps[state.mIdx],opts=shuffle(step.opts);
   $stage.innerHTML=`<div class="panel">
-    <p class="prompt">🔵 證明迷宮 —— 岔路 ${state.mIdx+1}/${MAZE.length}</p>
-    <div class="given">📜 ${MAZE_GIVEN}</div>
+    <p class="prompt">🔵 證明迷宮 —— 岔路 ${state.mIdx+1}/${steps.length}</p>
+    <div class="given">📜 ${state.maze.given}</div>
     <p class="prompt" style="font-size:1.05rem">${step.q}</p>
     <div class="forks" id="forks">
-      ${step.opts.map((o,i)=>`<button class="fork" data-i="${i}">${o.t}</button>`).join("")}
+      ${opts.map((o,i)=>`<button class="fork" data-i="${i}">${o.t}</button>`).join("")}
     </div>
     <div class="feedback" id="fb"></div>
     <div class="controls"><button class="btn hidden" id="next">前進 ▶</button></div>
   </div>`;
   const forks=document.querySelectorAll(".fork");
   forks.forEach(f=>f.onclick=()=>{
-    const o=step.opts[+f.dataset.i];
+    const o=opts[+f.dataset.i];
     const fb=document.getElementById("fb");
     if(o.ok){
       forks.forEach(x=>x.disabled=true);
@@ -488,62 +555,93 @@ function renderLevel2(){
   });
   document.getElementById("next").onclick=()=>{
     state.mIdx++;
-    if(state.mIdx>=MAZE.length){state.shards++;state.stageIdx=3;state.bossPart=0;renderBoss();}
+    if(state.mIdx>=state.maze.steps.length){state.shards++;state.stageIdx=3;state.bossPart=0;renderBoss();}
     else renderLevel2();
   };
 }
 
 /* ================= 🔴 Boss：會考模擬 ================= */
-// 平行四邊形 ABCD，對角線 AC；AB=CD（一刻線）、BC=DA（兩刻線）、AC 公共邊
+// Boss 圖一：平行四邊形 ABCD + 對角線 AC（AB=CD 一刻線、BC=DA 兩刻線）
 const BOSS_PARA={A:[55,55],B:[200,42],C:[218,168],D:[73,182]};
-function bossFigureSVG(){
+function parallelogramSVG(a){
   const P=BOSS_PARA;const cen=[(P.A[0]+P.B[0]+P.C[0]+P.D[0])/4,(P.A[1]+P.B[1]+P.C[1]+P.D[1])/4];
   let s="";
-  // 四邊形外框
   s+=`<path d="M${P.A[0]} ${P.A[1]} L${P.B[0]} ${P.B[1]} L${P.C[0]} ${P.C[1]} L${P.D[0]} ${P.D[1]} Z" fill="rgba(244,241,233,.04)" stroke="var(--chalk)" stroke-width="2.4" stroke-linejoin="round"/>`;
-  // 對角線 AC
-  s+=`<line x1="${P.A[0]}" y1="${P.A[1]}" x2="${P.C[0]}" y2="${P.C[1]}" stroke="var(--chalk)" stroke-width="2.2" stroke-dasharray="0"/>`;
-  // 刻線：AB & CD 一條；BC & DA 兩條
+  s+=`<line x1="${P.A[0]}" y1="${P.A[1]}" x2="${P.C[0]}" y2="${P.C[1]}" stroke="var(--chalk)" stroke-width="2.2"/>`;
   s+=drawTicks(P.A,P.B,1)+drawTicks(P.C,P.D,1);
   s+=drawTicks(P.B,P.C,2)+drawTicks(P.D,P.A,2);
-  // ∠B 標記 + 70°
   s+=drawArc(P.B,P.A,P.C,1);
-  s+=`<text x="${P.B[0]-22}" y="${P.B[1]+18}" fill="var(--accent-soft)" font-size="13" font-weight="bold">70°</text>`;
-  // 頂點標籤
+  s+=`<text x="${P.B[0]-26}" y="${P.B[1]+20}" fill="var(--accent-soft)" font-size="13" font-weight="bold">${a}°</text>`;
   [["A",P.A],["B",P.B],["C",P.C],["D",P.D]].forEach(([t,v])=>{
     const dir=unit(sub(v,cen));const p=add(v,mul(dir,16));
     s+=`<text x="${p[0]}" y="${p[1]+5}" text-anchor="middle" fill="var(--chalk)" font-size="16" font-weight="bold">${t}</text>`;
   });
   return`<svg viewBox="0 0 280 230" style="max-width:340px;width:100%">${s}</svg>`;
 }
+// Boss 圖二：等腰三角形 ABC（AB=AC）+ 角平分線 AD
+const BOSS_ISO={A:[140,28],B:[48,184],C:[232,184],D:[140,184]};
+function isoscelesSVG(a){
+  const P=BOSS_ISO;const cen=[(P.A[0]+P.B[0]+P.C[0])/3,(P.A[1]+P.B[1]+P.C[1])/3];
+  let s="";
+  s+=`<path d="M${P.A[0]} ${P.A[1]} L${P.B[0]} ${P.B[1]} L${P.C[0]} ${P.C[1]} Z" fill="rgba(244,241,233,.04)" stroke="var(--chalk)" stroke-width="2.4" stroke-linejoin="round"/>`;
+  s+=`<line x1="${P.A[0]}" y1="${P.A[1]}" x2="${P.D[0]}" y2="${P.D[1]}" stroke="var(--chalk)" stroke-width="2.2"/>`;
+  s+=drawTicks(P.A,P.B,1)+drawTicks(P.A,P.C,1);
+  s+=drawArc(P.A,P.B,P.D,1)+drawArc(P.A,P.D,P.C,1);
+  s+=drawArc(P.B,P.A,P.C,1);
+  s+=`<text x="${P.B[0]+12}" y="${P.B[1]-8}" fill="var(--accent-soft)" font-size="13" font-weight="bold">${a}°</text>`;
+  [["A",P.A],["B",P.B],["C",P.C],["D",P.D]].forEach(([t,v])=>{
+    const dir=unit(sub(v,cen));const p=add(v,mul(dir,16));
+    s+=`<text x="${p[0]}" y="${p[1]+5}" text-anchor="middle" fill="var(--chalk)" font-size="16" font-weight="bold">${t}</text>`;
+  });
+  return`<svg viewBox="0 0 280 215" style="max-width:340px;width:100%">${s}</svg>`;
+}
+const BOSS_SCENARIOS=[
+  {fig:parallelogramSVG,
+   given:"四邊形 ABCD 中，AB ＝ CD（單刻線）、BC ＝ DA（雙刻線），連對角線 AC。",
+   q1:"△ABC 與 △CDA 全等，依據哪個判定？",q1hint:"提示：AC 是兩個三角形的公共邊。",
+   rule:"SSS",
+   ruleWhy:"AB＝CD、BC＝DA、AC＝CA（公共邊），三邊對應相等，故 △ABC ≅ △CDA（SSS）。",
+   ask:"∠D",corr:"∠ABC ↔ ∠CDA"},
+  {fig:isoscelesSVG,
+   given:"△ABC 中，AB ＝ AC（單刻線），AD 平分 ∠BAC、交 BC 於 D。",
+   q1:"△ABD 與 △ACD 全等，依據哪個判定？",q1hint:"提示：AD 是兩個三角形的公共邊。",
+   rule:"SAS",
+   ruleWhy:"AB＝AC、∠BAD＝∠CAD（AD 平分 ∠A）、AD＝AD（公共邊），兩邊夾一角，故 △ABD ≅ △ACD（SAS）。",
+   ask:"∠C",corr:"∠ABD ↔ ∠ACD"}
+];
 function renderBoss(){
   clearTimer();state.screen="boss";renderHUD();
+  const scn=state.boss,a=state.bossAngle;
   if(state.bossPart===0){
     $stage.innerHTML=`<div class="panel">
       <p class="big">🔴 Boss：會考模擬</p>
-      <div class="given">📜 四邊形 ABCD 中，AB ＝ CD（單刻線）、BC ＝ DA（雙刻線），連對角線 AC。</div>
-      <div style="display:flex;justify-content:center">${bossFigureSVG()}</div>
-      <p class="prompt">第 ① 小題：△ABC 與 △CDA 全等，依據哪個判定？<br><span class="meta">提示：AC 是兩個三角形的公共邊。</span></p>
+      <div class="given">📜 ${scn.given}</div>
+      <div style="display:flex;justify-content:center">${scn.fig(a)}</div>
+      <p class="prompt">第 ① 小題：${scn.q1}<br><span class="meta">${scn.q1hint}</span></p>
       ${answersHTML()}
       <div class="feedback" id="fb"></div>
       <div class="controls"><button class="btn hidden" id="next">下一小題 ▶</button></div>
     </div>`;
-    const q={rule:"SSS"};
-    bindAnswers(q,(ok,chosen)=>{
-      const fb=document.getElementById("fb");
-      if(ok){
-        fb.innerHTML=`<div class="verdict ok">✔ 正確！SSS（邊邊邊）</div><div class="why">AB＝CD、BC＝DA、AC＝CA（公共邊），三邊對應相等，故 △ABC ≅ △CDA。</div>`;
-        document.getElementById("next").classList.remove("hidden");
-      }else{
-        const t=targetedHint(chosen,"SSS");
-        fb.innerHTML=`<div class="verdict no">再想想：三條邊（含公共邊 AC）都相等。</div><div class="why">${t?t:"正確答案是 SSS。"}</div>`;
-      }
+    document.querySelectorAll(".ans").forEach(b=>{
+      b.onclick=()=>{
+        const chosen=b.dataset.v,fb=document.getElementById("fb");
+        if(chosen===scn.rule){
+          document.querySelectorAll(".ans").forEach(x=>x.disabled=true);
+          b.classList.add("correct");
+          fb.innerHTML=`<div class="verdict ok">✔ 正確！${scn.rule}（${RULE_ZH[scn.rule]}）</div><div class="why">${scn.ruleWhy}</div>`;
+          document.getElementById("next").classList.remove("hidden");
+        }else{
+          b.classList.add("wrong");b.disabled=true;state.errorTally[scn.rule]++;
+          const t=targetedHint(chosen,scn.rule);
+          fb.innerHTML=`<div class="verdict no">✘ 再試一次</div><div class="why">${t?t:"想想三個條件（含公共邊）分別是什麼。"}</div>`;
+        }
+      };
     });
     document.getElementById("next").onclick=()=>{state.bossPart=1;renderBoss();};
   }else{
     $stage.innerHTML=`<div class="panel">
-      <div style="display:flex;justify-content:center">${bossFigureSVG()}</div>
-      <p class="prompt">第 ② 小題：已知 ∠B ＝ 70°，求 ∠D ＝ ?</p>
+      <div style="display:flex;justify-content:center">${scn.fig(a)}</div>
+      <p class="prompt">第 ② 小題：已知 ∠B ＝ ${a}°，求 ${scn.ask} ＝ ?</p>
       <div><input class="numin" id="ans" type="number" placeholder="?"><span class="unit">度</span></div>
       <div class="feedback" id="fb"></div>
       <div class="controls">
@@ -554,9 +652,9 @@ function renderBoss(){
     document.getElementById("check").onclick=()=>{
       const v=parseFloat(document.getElementById("ans").value);
       const fb=document.getElementById("fb");
-      if(v===70){
+      if(v===a){
         state.shards++;renderHUD();
-        fb.innerHTML=`<div class="verdict ok">✔ 答對！∠D ＝ 70°</div><div class="why">∠B 與 ∠D 是全等三角形的對應角（∠ABC ↔ ∠CDA），所以 ∠D ＝ ∠B ＝ 70°。</div>`;
+        fb.innerHTML=`<div class="verdict ok">✔ 答對！${scn.ask} ＝ ${a}°</div><div class="why">利用全等三角形「對應角相等」（${scn.corr}），${scn.ask} ＝ ∠B ＝ ${a}°。</div>`;
         document.getElementById("check").classList.add("hidden");
         document.getElementById("win").classList.remove("hidden");
       }else{
@@ -567,10 +665,125 @@ function renderBoss(){
   }
 }
 
-/* ================= 通關：徽章 + 學習追蹤 ================= */
+/* ================= 通關：湖畔頒獎 + 煙火 + 學習追蹤 ================= */
+function rose(x,y,r,c1,c2){
+  let s=`<g transform="translate(${x},${y})">`;
+  for(let k=0;k<6;k++){const a=k*Math.PI/3;
+    s+=`<circle cx="${(Math.cos(a)*r*0.72).toFixed(1)}" cy="${(Math.sin(a)*r*0.72).toFixed(1)}" r="${(r*0.62).toFixed(1)}" fill="${c1}"/>`;}
+  s+=`<circle r="${(r*0.6).toFixed(1)}" fill="${c2}"/></g>`;return s;
+}
+function leaf(x,y,rot,c){return`<ellipse cx="${x}" cy="${y}" rx="10" ry="4.2" fill="${c}" transform="rotate(${rot} ${x} ${y})"/>`;}
+function spark(x,y,s,c){return`<path d="M${x} ${y-s} L${x+s*0.26} ${y-s*0.26} L${x+s} ${y} L${x+s*0.26} ${y+s*0.26} L${x} ${y+s} L${x-s*0.26} ${y+s*0.26} L${x-s} ${y} L${x-s*0.26} ${y-s*0.26} Z" fill="${c}"/>`;}
+
+function sceneSVG(){
+  return `<svg class="scene" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#241a48"/><stop offset="45%" stop-color="#6b4a86"/>
+      <stop offset="78%" stop-color="#d98a9a"/><stop offset="100%" stop-color="#ffd9a8"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f4c89a"/><stop offset="30%" stop-color="#b98aa0"/><stop offset="100%" stop-color="#3b2f63"/>
+    </linearGradient>
+    <radialGradient id="sunglow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff3c0" stop-opacity="0.9"/><stop offset="100%" stop-color="#fff3c0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff6d0"/><stop offset="35%" stop-color="#ffd87a"/>
+      <stop offset="70%" stop-color="#f3aa6a"/><stop offset="100%" stop-color="#f5a6bb"/>
+    </linearGradient>
+    <linearGradient id="woodTop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d49a5c"/><stop offset="100%" stop-color="#b07636"/>
+    </linearGradient>
+    <linearGradient id="woodFront" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a4682f"/><stop offset="100%" stop-color="#7c4a22"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="800" height="270" fill="url(#sky)"/>
+  <circle cx="120" cy="60" r="1.6" fill="#fff" opacity=".7"/><circle cx="210" cy="40" r="1.2" fill="#fff" opacity=".6"/>
+  <circle cx="300" cy="84" r="1.5" fill="#fff" opacity=".5"/><circle cx="60" cy="112" r="1.3" fill="#fff" opacity=".5"/>
+  <circle cx="700" cy="50" r="1.4" fill="#fff" opacity=".6"/><circle cx="430" cy="56" r="1.2" fill="#fff" opacity=".5"/>
+  <circle cx="580" cy="205" r="120" fill="url(#sunglow)"/>
+  <circle cx="580" cy="205" r="46" fill="#ffe9b0"/>
+  <path d="M150,92 q8,-7 16,0 q8,-7 16,0" fill="none" stroke="#2a2340" stroke-width="2" opacity=".55"/>
+  <path d="M196,76 q6,-5 12,0 q6,-5 12,0" fill="none" stroke="#2a2340" stroke-width="2" opacity=".45"/>
+  <rect x="0" y="270" width="800" height="120" fill="url(#water)"/>
+  <ellipse cx="580" cy="288" rx="40" ry="4" fill="#ffe3a8" opacity=".5"/>
+  <ellipse cx="580" cy="304" rx="54" ry="4" fill="#ffdca0" opacity=".4"/>
+  <ellipse cx="580" cy="322" rx="34" ry="3" fill="#ffe3a8" opacity=".35"/>
+  <ellipse cx="580" cy="342" rx="60" ry="4" fill="#ffd9a0" opacity=".3"/>
+  <path d="M70,300 C66,250 62,210 76,180" fill="none" stroke="#2f2a44" stroke-width="6"/>
+  <path d="M76,184 C50,200 40,240 34,286" fill="none" stroke="#3a5a3a" stroke-width="3" opacity=".8"/>
+  <path d="M78,184 C70,210 66,250 64,290" fill="none" stroke="#3a5a3a" stroke-width="3" opacity=".8"/>
+  <path d="M80,186 C96,206 104,244 108,288" fill="none" stroke="#3a5a3a" stroke-width="3" opacity=".8"/>
+  <path d="M0,360 Q400,334 800,360 L800,500 L0,500 Z" fill="#47603c"/>
+  <path d="M0,374 Q400,352 800,374 L800,500 L0,500 Z" fill="#3a5132"/>
+  <path d="M120,372 C118,352 120,344 124,332" stroke="#6b7d3a" stroke-width="3" fill="none"/>
+  <path d="M128,372 C130,352 132,346 138,336" stroke="#6b7d3a" stroke-width="3" fill="none"/>
+  <path d="M690,374 C688,352 690,344 694,334" stroke="#6b7d3a" stroke-width="3" fill="none"/>
+  <polygon points="250,372 550,372 610,410 190,410" fill="url(#woodTop)" stroke="#7c4a22" stroke-width="1.5"/>
+  <polygon points="190,410 610,410 610,440 190,440" fill="url(#woodFront)"/>
+  <path d="M270,382 Q400,376 530,382" stroke="#8a5a2c" stroke-width="1.4" fill="none" opacity=".5"/>
+  <path d="M240,396 Q400,389 560,396" stroke="#8a5a2c" stroke-width="1.4" fill="none" opacity=".5"/>
+  <rect x="212" y="440" width="22" height="50" fill="url(#woodFront)"/>
+  <rect x="566" y="440" width="22" height="50" fill="url(#woodFront)"/>
+  <rect x="190" y="408" width="420" height="4" fill="#caa066" opacity=".6"/>
+  <!-- 左花束 -->
+  <path d="M236,402 Q250,382 262,364" stroke="#3f7d3a" stroke-width="2.5" fill="none"/>
+  <path d="M252,404 Q256,384 250,366" stroke="#3f7d3a" stroke-width="2.5" fill="none"/>
+  ${leaf(258,384,20,'#3f7d3a')}${leaf(244,390,-25,'#356b32')}
+  ${rose(250,358,9,'#ff9ec0','#e76d97')}${rose(270,366,8,'#ff7a99','#d64d6e')}${rose(234,368,7,'#ffd29a','#eaa45e')}
+  <!-- 右花瓶 -->
+  <path d="M512,408 L556,408 L550,378 L518,378 Z" fill="#bfe0ea" opacity=".85" stroke="#8fbecb" stroke-width="1.5"/>
+  <ellipse cx="534" cy="378" rx="16" ry="4" fill="#a9d2dd"/>
+  <path d="M534,378 L518,352" stroke="#3f7d3a" stroke-width="2.5" fill="none"/>
+  <path d="M534,378 L534,344" stroke="#3f7d3a" stroke-width="2.5" fill="none"/>
+  <path d="M534,378 L552,356" stroke="#3f7d3a" stroke-width="2.5" fill="none"/>
+  ${leaf(524,366,40,'#3f7d3a')}${leaf(546,368,-40,'#356b32')}
+  ${rose(516,350,9,'#ff7a99','#d64d6e')}${rose(534,340,10,'#ff9ec0','#e76d97')}${rose(552,354,8,'#ffb38a','#e98a5a')}
+  <!-- 獎杯 -->
+  <rect x="362" y="380" width="76" height="16" rx="3" fill="url(#woodFront)" stroke="#6e3f1c" stroke-width="1"/>
+  <rect x="372" y="382" width="56" height="9" rx="2" fill="url(#gold)"/>
+  <path d="M388,362 L412,362 L408,380 L392,380 Z" fill="url(#gold)"/>
+  <ellipse cx="400" cy="366" rx="16" ry="6" fill="url(#gold)" stroke="#c98a40" stroke-width="1"/>
+  <path d="M344,262 C306,264 304,312 350,322" fill="none" stroke="url(#gold)" stroke-width="9" stroke-linecap="round"/>
+  <path d="M456,262 C494,264 496,312 450,322" fill="none" stroke="url(#gold)" stroke-width="9" stroke-linecap="round"/>
+  <path d="M342,256 C342,314 366,362 400,362 C434,362 458,314 458,256 Z" fill="url(#gold)" stroke="#cf9446" stroke-width="1.5"/>
+  <ellipse cx="400" cy="254" rx="58" ry="13" fill="url(#gold)" stroke="#cf9446" stroke-width="1.5"/>
+  <ellipse cx="400" cy="254" rx="47" ry="8.5" fill="#d9974c"/>
+  <ellipse cx="400" cy="253" rx="47" ry="7" fill="#b87632" opacity=".5"/>
+  <path d="M366,264 C360,300 372,338 388,352" stroke="#fff7e6" stroke-width="6" fill="none" stroke-linecap="round" opacity=".4"/>
+  <!-- 玫瑰藤蔓 -->
+  <path d="M350,360 C332,332 340,296 362,268" fill="none" stroke="#3f7d3a" stroke-width="3"/>
+  <path d="M450,360 C468,332 460,296 438,268" fill="none" stroke="#3f7d3a" stroke-width="3"/>
+  ${leaf(344,330,30,'#3f7d3a')}${leaf(456,330,-30,'#3f7d3a')}${leaf(350,300,10,'#356b32')}${leaf(450,300,-10,'#356b32')}
+  ${rose(360,270,7,'#ff8fab','#e85d82')}${rose(346,300,6,'#ff8fab','#e85d82')}${rose(354,332,6,'#ffa9be','#e76d8e')}
+  ${rose(440,270,7,'#ff8fab','#e85d82')}${rose(454,300,6,'#ff8fab','#e85d82')}${rose(446,332,6,'#ffa9be','#e76d8e')}
+  <!-- 第一名 刻牌 -->
+  <rect x="358" y="292" width="84" height="30" rx="7" fill="#e7a64e" stroke="#a9701f" stroke-width="2"/>
+  <rect x="358" y="292" width="84" height="12" rx="7" fill="#ffffff" opacity=".18"/>
+  <text x="401" y="314" text-anchor="middle" font-size="19" font-weight="bold" fill="#ffe6b0" opacity=".7">第一名</text>
+  <text x="400" y="313" text-anchor="middle" font-size="19" font-weight="bold" fill="#6e3f17">第一名</text>
+  <path d="M360,318 L350,340 L366,331 Z" fill="#cf8a36"/>
+  <path d="M440,318 L450,340 L434,331 Z" fill="#cf8a36"/>
+  ${spark(330,250,7,'#fff3c0')}${spark(470,266,6,'#ffffff')}${spark(400,230,8,'#ffe9b0')}${spark(352,300,4,'#ffffff')}${spark(452,332,5,'#fff3c0')}
+  </svg>`;
+}
+
+const FW_COLORS=['#ff4d6d','#ffd166','#4cc9f0','#06d6a0','#c77dff','#f72585','#ffb703','#80ffdb','#ff7b00','#b5179e'];
+function fireworksHTML(n){
+  let s=`<div class="fw-layer">`;
+  for(let i=0;i<n;i++){
+    const c=FW_COLORS[i%FW_COLORS.length];
+    const x=(8+Math.random()*80).toFixed(1),y=(6+Math.random()*38).toFixed(1),dist=(50+Math.random()*30).toFixed(0);
+    let spans="";for(let k=0;k<14;k++)spans+=`<span style="--a:${(k*360/14).toFixed(1)}deg"></span>`;
+    s+=`<div class="firework" style="left:${x}%;top:${y}%;--fc:${c};--d:-${dist}px;--dl:${(i*0.4).toFixed(2)}s">${spans}</div>`;
+  }
+  return s+`</div>`;
+}
+
 function renderWin(){
   clearTimer();state.screen="win";state.stageIdx=4;renderHUD();
-  // 學習追蹤建議
   const review={
     SSS:"複習：三邊都要標相等，才算 SSS。",
     SAS:"複習：SAS 的角必須是兩邊的『夾角』。",
@@ -588,17 +801,31 @@ function renderWin(){
       errs.map(([r,n])=>`<li>・${r==="NONE"?"陷阱題":r}（錯 ${n} 次）：${review[r]}</li>`).join("")+`</div>`;
   }
   $stage.innerHTML=`<div class="panel">
-    <div class="badge">🏅</div>
-    <p class="big">三角形獵人徽章 GET！</p>
-    <p class="prompt">你共蒐集了 <strong>${state.shards}</strong> 塊三角形碎片 🔺，闖過全部四道關卡。</p>
+    <p class="win-title">🎉 通關！你是本班的三角形獵人 · 第一名 🎉</p>
+    <div class="scene-wrap">${sceneSVG()}${fireworksHTML(state.shards)}</div>
+    <p class="prompt" style="margin-top:14px">蒐集了 <strong>${state.shards}</strong> 塊三角形碎片 🔺，為你綻放 <strong>${state.shards}</strong> 發繽紛煙火！</p>
     ${reviewHTML}
-    <div class="controls"><button class="btn" id="again">再挑戰一次 🔄</button></div>
+    <div class="controls win-actions">
+      <button class="btn" id="again">再挑戰一次 🔄</button>
+      <button class="btn ghost" id="leave">離開 🚪</button>
+    </div>
   </div>`;
-  document.getElementById("again").onclick=()=>{
-    state.shards=0;state.vIdx=0;state.mIdx=0;state.bossPart=0;state.stageIdx=0;
-    state.errorTally={SSS:0,SAS:0,ASA:0,AAS:0,RHS:0,NONE:0};
-    renderStart();
-  };
+  document.getElementById("again").onclick=()=>{newRun();renderStart();};
+  document.getElementById("leave").onclick=renderFarewell;
+}
+
+function renderFarewell(){
+  clearTimer();state.screen="farewell";
+  document.getElementById("stages").innerHTML="";
+  document.getElementById("hud").innerHTML="";
+  $stage.innerHTML=`<div class="panel">
+    <div class="badge">🌅</div>
+    <p class="big">下次再來狩獵！</p>
+    <p class="prompt">感謝遊玩《三角形獵人》，<br>願你帶著「第一名」的好心情離開。<br><span class="meta">（可直接關閉此分頁）</span></p>
+    <div class="controls"><button class="btn ghost" id="back">回到首頁</button></div>
+  </div>`;
+  document.getElementById("back").onclick=()=>{newRun();renderStart();};
+  try{window.close();}catch(e){}
 }
 
 /* ================= 共用：規則按鈕綁定 ================= */
@@ -624,6 +851,7 @@ document.addEventListener("keydown",e=>{
   }
 });
 
+newRun();
 renderStart();
 </script>
 </body>
