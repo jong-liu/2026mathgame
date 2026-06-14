@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>班級數學工具箱 · 國中數學闖關遊戲</title>
+<style>
+  :root{
+    --bg:#0f201a;--board:#142b22;--chalk:#f4f1e9;--chalk-dim:#b8c2bb;
+    --accent:#ffae42;--accent-soft:#ffce8a;--good:#7fd1ae;--bad:#ff7b72;--line:#3a5346;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);color:var(--chalk);
+    font-family:"Segoe UI","Microsoft JhengHei","PingFang TC",sans-serif;line-height:1.6;
+    min-height:100vh;padding:28px 16px 70px;
+    background-image:
+      radial-gradient(circle at 12% 18%,rgba(255,255,255,.025) 0,transparent 40%),
+      radial-gradient(circle at 88% 72%,rgba(255,255,255,.02) 0,transparent 45%);
+  }
+  .wrap{max-width:980px;margin:0 auto;}
+
+  /* ===== 標題區 ===== */
+  header{text-align:center;margin-bottom:8px;}
+  h1{font-size:2.4rem;margin:.1em 0;color:var(--accent);letter-spacing:4px;text-shadow:0 1px 0 rgba(0,0,0,.5);}
+  .subtitle{color:var(--chalk-dim);margin:.3em 0 4px;font-size:1rem;letter-spacing:1px;}
+  .chalk-line{height:0;border:none;border-top:2px dashed var(--line);max-width:520px;margin:18px auto 0;}
+  .count-note{text-align:center;color:var(--chalk-dim);font-size:.86rem;margin:10px 0 28px;}
+  .count-note b{color:var(--accent);}
+
+  /* ===== 分類區塊 ===== */
+  .strand{margin-bottom:34px;}
+  .strand-head{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:8px;border-bottom:2px solid var(--line);}
+  .strand-icon{font-size:1.5rem;}
+  .strand-title{font-size:1.3rem;font-weight:bold;color:var(--accent-soft);letter-spacing:2px;}
+  .strand-en{color:var(--chalk-dim);font-size:.82rem;letter-spacing:1px;}
+  .strand-badge{margin-left:auto;background:var(--board);border:1px solid var(--line);border-radius:20px;padding:2px 12px;font-size:.78rem;color:var(--chalk-dim);}
+
+  /* ===== 工具卡 ===== */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+  .card{
+    display:flex;flex-direction:column;text-decoration:none;color:inherit;
+    background:var(--board);border:1px solid var(--line);border-radius:16px;
+    padding:18px 18px 16px;position:relative;overflow:hidden;
+    transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+  }
+  .card::before{content:"";position:absolute;inset:0;border-radius:16px;pointer-events:none;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.02);}
+  .card:hover{transform:translateY(-5px);border-color:var(--accent);box-shadow:0 10px 26px -8px rgba(255,174,66,.35);}
+  .card-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+  .card-emoji{font-size:2.1rem;line-height:1;}
+  .card-name{font-size:1.18rem;font-weight:bold;color:var(--chalk);letter-spacing:1px;}
+  .topic-chip{display:inline-block;background:rgba(255,174,66,.14);border:1px solid var(--accent);color:var(--accent-soft);
+    border-radius:20px;padding:2px 11px;font-size:.76rem;font-weight:bold;margin-bottom:10px;align-self:flex-start;}
+  .card-desc{color:var(--chalk-dim);font-size:.9rem;margin:0 0 14px;flex:1;}
+  .card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px;}
+  .tag{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:6px;padding:1px 8px;font-size:.72rem;color:var(--chalk-dim);}
+  .enter{align-self:flex-start;background:var(--accent);color:#222;font-weight:bold;border-radius:10px;
+    padding:7px 18px;font-size:.92rem;letter-spacing:1px;transition:filter .15s ease;}
+  .card:hover .enter{filter:brightness(1.12);}
+
+  /* ===== 即將推出 ===== */
+  .soon .strand-title{color:var(--chalk-dim);}
+  .soon-card{background:transparent;border:1.5px dashed var(--line);color:var(--chalk-dim);
+    border-radius:16px;padding:22px 18px;text-align:center;font-size:.92rem;}
+  .soon-card b{color:var(--accent-soft);}
+
+  footer{text-align:center;color:var(--chalk-dim);font-size:.82rem;margin-top:34px;}
+  footer a{color:var(--accent-soft);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🧮 班級數學工具箱</h1>
+    <p class="subtitle">國中數學 · 主題闖關遊戲 — 看圖識性質、邊玩邊學</p>
+    <hr class="chalk-line">
+    <p class="count-note">目前收錄 <b id="count">0</b> 個工具，依國中數學主題分類 · 持續增加中 ✏️</p>
+  </header>
+
+  <main id="board"></main>
+
+  <footer>
+    粉筆黑板風 · 純前端遊戲，免安裝直接玩 ｜
+    <a href="https://github.com/jong-liu/2026mathgame" target="_blank" rel="noopener">GitHub 原始碼</a>
+  </footer>
+</div>
+
+<script>
+/* ===== 國中數學主題（strand）順序與標頭 ===== */
+const STRANDS=[
+  {key:"number",  icon:"🔢", zh:"數與量",     en:"Number & Quantity"},
+  {key:"algebra", icon:"📈", zh:"代數",       en:"Algebra"},
+  {key:"geometry",icon:"📐", zh:"幾何",       en:"Geometry"},
+  {key:"stats",   icon:"📊", zh:"統計與機率", en:"Statistics & Probability"},
+];
+
+/* ===== 工具清單：加新工具時只要往這裡新增一筆 ===== */
+const TOOLS=[
+  {
+    strand:"geometry",
+    topic:"三角形的全等",
+    emoji:"🔺",
+    name:"三角形獵人",
+    url:"tools/triangle-congruence/",
+    desc:"四關卡闖關判定三角形全等，從新手村一路打到 Boss 會考。",
+    tags:["SSS","SAS","ASA","AAS","RHS","SSA／AAA 陷阱"]
+  },
+  {
+    strand:"geometry",
+    topic:"中垂線與角平分線性質",
+    emoji:"🔍",
+    name:"幾何神探",
+    url:"tools/bisector-properties/",
+    desc:"看圖識性質，推理中垂線、角平分線與外心、內心的距離關係。",
+    tags:["中垂線性質／逆定理","角平分線性質／逆定理","外心","內心"]
+  },
+];
+
+/* ===== 渲染 ===== */
+const board=document.getElementById("board");
+document.getElementById("count").textContent=TOOLS.length;
+
+STRANDS.forEach(s=>{
+  const items=TOOLS.filter(t=>t.strand===s.key);
+  if(items.length===0) return; // 沒有工具的主題先不顯示
+  const sec=document.createElement("section");
+  sec.className="strand";
+  sec.innerHTML=`
+    <div class="strand-head">
+      <span class="strand-icon">${s.icon}</span>
+      <span class="strand-title">${s.zh}</span>
+      <span class="strand-en">${s.en}</span>
+      <span class="strand-badge">${items.length} 個工具</span>
+    </div>
+    <div class="grid">
+      ${items.map(t=>`
+        <a class="card" href="${t.url}">
+          <div class="card-top">
+            <span class="card-emoji">${t.emoji}</span>
+            <span class="card-name">${t.name}</span>
+          </div>
+          <span class="topic-chip">${t.topic}</span>
+          <p class="card-desc">${t.desc}</p>
+          <div class="card-tags">${t.tags.map(x=>`<span class="tag">${x}</span>`).join("")}</div>
+          <span class="enter">進入 ▶</span>
+        </a>`).join("")}
+    </div>`;
+  board.appendChild(sec);
+});
+
+/* 已涵蓋主題之外，給未來工具一個「即將推出」的位子 */
+const future=STRANDS.filter(s=>!TOOLS.some(t=>t.strand===s.key));
+if(future.length){
+  const sec=document.createElement("section");
+  sec.className="strand soon";
+  sec.innerHTML=`
+    <div class="strand-head">
+      <span class="strand-icon">🚧</span>
+      <span class="strand-title">更多主題陸續登場</span>
+      <span class="strand-en">Coming soon</span>
+    </div>
+    <div class="grid">
+      ${future.map(s=>`<div class="soon-card">${s.icon} <b>${s.zh}</b><br>敬請期待</div>`).join("")}
+    </div>`;
+  board.appendChild(sec);
+}
+</script>
+</body>
+</html>

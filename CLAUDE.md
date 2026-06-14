@@ -16,6 +16,7 @@
 
 ## 工具清單
 （之後加新工具時會自動更新）
+- **總覽首頁** `index.html` — 國中數學主題分類的工具箱入口（黑板風）。加新工具只要往 `index.html` 的 `TOOLS` 陣列新增一筆即可自動歸類。網址：https://jong-liu.github.io/2026mathgame/
 - **三角形獵人** `tools/triangle-congruence/` — 三角形全等判定闖關遊戲（新手村→配對挑戰→證明迷宮→Boss會考），涵蓋 SSS/SAS/ASA/AAS/RHS + SSA/AAA 陷阱。網址：https://jong-liu.github.io/2026mathgame/tools/triangle-congruence/
 - **幾何神探** `tools/bisector-properties/` — 中垂線與角平分線性質闖關遊戲（新手村→配對挑戰→證明迷宮→Boss會考），涵蓋中垂線性質/逆定理、角平分線性質/逆定理、外心、內心。網址：https://jong-liu.github.io/2026mathgame/tools/bisector-properties/
 
