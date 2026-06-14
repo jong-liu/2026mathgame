@@ -34,8 +34,17 @@
   .fig-row svg{max-width:280px;width:100%;height:auto;display:block;}
 
   details.ref{background:var(--board);border:1px solid var(--line);border-radius:12px;padding:4px 14px;margin-bottom:14px;}
-  details.ref summary{cursor:pointer;font-weight:bold;color:var(--accent-soft);padding:6px 0;list-style:none;}
-  details.ref summary::before{content:"📐 ";}
+  details.ref summary{cursor:pointer;font-weight:bold;color:var(--accent-soft);padding:6px 4px;list-style:none;display:flex;align-items:center;gap:9px;}
+  details.ref summary::-webkit-details-marker{display:none;}
+  /* 自製動畫箭頭：未開時上下跳動吸引注意，展開後旋轉朝上並停止 */
+  details.ref summary::before{content:"";flex:0 0 auto;width:12px;height:12px;border-right:3px solid var(--accent);border-bottom:3px solid var(--accent);border-radius:2px;transform:rotate(45deg);transition:transform .3s ease;animation:refBounce 1.05s ease-in-out infinite;}
+  details.ref[open] summary::before{transform:rotate(-135deg);animation:none;}
+  details.ref summary::after{content:"輕觸展開 👆";font-size:.74rem;color:var(--accent);font-weight:bold;margin-left:6px;animation:refBlink 1.05s ease-in-out infinite;}
+  details.ref[open] summary::after{content:"";animation:none;}
+  details.ref:not([open]){animation:refGlow 1.6s ease-in-out infinite;}
+  @keyframes refBounce{0%,100%{transform:rotate(45deg) translate(0,0);}50%{transform:rotate(45deg) translate(3px,3px);}}
+  @keyframes refBlink{0%,100%{opacity:.35;}50%{opacity:1;}}
+  @keyframes refGlow{0%,100%{box-shadow:0 0 0 0 rgba(255,174,66,0);}50%{box-shadow:0 0 14px 2px rgba(255,174,66,.5);}}
   .ref-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;padding:8px 0 12px;}
   .ref-card{border:1px solid var(--line);border-radius:10px;padding:10px;background:rgba(255,255,255,.02);}
   .ref-card b{color:var(--accent);}
