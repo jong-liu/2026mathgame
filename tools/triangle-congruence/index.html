@@ -52,6 +52,34 @@
   .hud b{color:var(--accent);}
   .timer.low{color:var(--bad)!important;}
 
+  /* 配對挑戰：舞台內大型倒數 */
+  .countdown-bar{
+    display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px;
+  }
+  .countdown-num{
+    font-size:2.8rem;font-weight:bold;color:var(--good);
+    font-variant-numeric:tabular-nums;line-height:1;
+    transition:color .2s;
+    min-width:62px;text-align:center;
+  }
+  .countdown-num.warn{
+    color:var(--bad);
+    animation:countpulse .5s ease-in-out infinite alternate;
+  }
+  @keyframes countpulse{
+    from{transform:scale(1);}
+    to{transform:scale(1.18);}
+  }
+  .countdown-track{
+    flex:1;max-width:260px;height:7px;background:rgba(255,255,255,.1);
+    border-radius:4px;overflow:hidden;
+  }
+  .countdown-fill{
+    height:100%;background:var(--good);border-radius:4px;
+    transition:width .9s linear,background .3s;
+  }
+  .countdown-fill.warn{background:var(--bad);}
+
   .panel{
     background:var(--board);border:1px solid var(--line);border-radius:14px;
     padding:18px;text-align:center;
@@ -434,12 +462,25 @@ function renderLevel1Intro(){
     state.l1Time=60;state.l1Defeat=0;state.l1Wrong=0;startLevel1Timer();nextLevel1();
   };
 }
+const L1_TOTAL=60;
+function updateCountdownUI(){
+  const t=state.l1Time;
+  const warn=t<=5;
+  // HUD
+  const hd=document.getElementById("timerDisp");
+  if(hd){hd.textContent=`⏱️ ${t}s`;if(t<=10)hd.classList.add("low");}
+  // 舞台大數字
+  const num=document.getElementById("cdNum");
+  const fill=document.getElementById("cdFill");
+  if(num){num.textContent=t;num.className="countdown-num"+(warn?" warn":"");}
+  if(fill){fill.style.width=`${(t/L1_TOTAL)*100}%`;fill.className="countdown-fill"+(warn?" warn":"");}
+}
 function startLevel1Timer(){
   clearTimer();
   state.timerId=setInterval(()=>{
     state.l1Time--;
-    const d=document.getElementById("timerDisp");
-    if(d){d.textContent=`⏱️ ${state.l1Time}s`;if(state.l1Time<=10)d.classList.add("low");}
+    updateCountdownUI();
+    if(state.l1Time<=5&&state.l1Time>0)sndBeep();
     if(state.l1Time<=0){clearTimer();renderLevel1Done();}
   },1000);
 }
@@ -447,6 +488,11 @@ function nextLevel1(){
   state.screen="level1";renderHUD();
   const q=instq(shuffle(BANK)[0]);state.l1Q=q;
   $stage.innerHTML=`<div class="panel">
+    <div class="countdown-bar">
+      <div class="countdown-num" id="cdNum">${state.l1Time}</div>
+      <div class="countdown-track"><div class="countdown-fill" id="cdFill" style="width:${(state.l1Time/L1_TOTAL)*100}%"></div></div>
+      <span style="color:var(--chalk-dim);font-size:.9rem">秒</span>
+    </div>
     <div class="monster" id="mon">👾</div>
     <p class="prompt">這組三角形依<strong>哪個性質</strong>全等？</p>
     ${pairHTML(q)}
@@ -545,11 +591,11 @@ function renderLevel2(){
     const fb=document.getElementById("fb");
     if(o.ok){
       forks.forEach(x=>x.disabled=true);
-      f.classList.add("correct");
+      f.classList.add("correct");sndCorrect();
       fb.innerHTML=`<div class="verdict ok">✔ 正確！這條路通了。</div>`;
       document.getElementById("next").classList.remove("hidden");
     }else{
-      f.classList.add("wrong");f.disabled=true;
+      f.classList.add("wrong");f.disabled=true;sndWrong();
       fb.innerHTML=`<div class="verdict no">✘ 走進死路</div><div class="why">${o.hint} 回到岔路再選一次。</div>`;
     }
   });
@@ -627,11 +673,11 @@ function renderBoss(){
         const chosen=b.dataset.v,fb=document.getElementById("fb");
         if(chosen===scn.rule){
           document.querySelectorAll(".ans").forEach(x=>x.disabled=true);
-          b.classList.add("correct");
+          b.classList.add("correct");sndCorrect();
           fb.innerHTML=`<div class="verdict ok">✔ 正確！${scn.rule}（${RULE_ZH[scn.rule]}）</div><div class="why">${scn.ruleWhy}</div>`;
           document.getElementById("next").classList.remove("hidden");
         }else{
-          b.classList.add("wrong");b.disabled=true;state.errorTally[scn.rule]++;
+          b.classList.add("wrong");b.disabled=true;state.errorTally[scn.rule]++;sndWrong();
           const t=targetedHint(chosen,scn.rule);
           fb.innerHTML=`<div class="verdict no">✘ 再試一次</div><div class="why">${t?t:"想想三個條件（含公共邊）分別是什麼。"}</div>`;
         }
@@ -653,7 +699,7 @@ function renderBoss(){
       const v=parseFloat(document.getElementById("ans").value);
       const fb=document.getElementById("fb");
       if(v===a){
-        state.shards++;renderHUD();
+        state.shards++;renderHUD();sndCorrect();
         fb.innerHTML=`<div class="verdict ok">✔ 答對！${scn.ask} ＝ ${a}°</div><div class="why">利用全等三角形「對應角相等」（${scn.corr}），${scn.ask} ＝ ∠B ＝ ${a}°。</div>`;
         document.getElementById("check").classList.add("hidden");
         document.getElementById("win").classList.remove("hidden");
@@ -759,11 +805,9 @@ function sceneSVG(){
   ${leaf(344,330,30,'#3f7d3a')}${leaf(456,330,-30,'#3f7d3a')}${leaf(350,300,10,'#356b32')}${leaf(450,300,-10,'#356b32')}
   ${rose(360,270,7,'#ff8fab','#e85d82')}${rose(346,300,6,'#ff8fab','#e85d82')}${rose(354,332,6,'#ffa9be','#e76d8e')}
   ${rose(440,270,7,'#ff8fab','#e85d82')}${rose(454,300,6,'#ff8fab','#e85d82')}${rose(446,332,6,'#ffa9be','#e76d8e')}
-  <!-- 第一名 刻牌 -->
-  <rect x="358" y="292" width="84" height="30" rx="7" fill="#e7a64e" stroke="#a9701f" stroke-width="2"/>
-  <rect x="358" y="292" width="84" height="12" rx="7" fill="#ffffff" opacity=".18"/>
-  <text x="401" y="314" text-anchor="middle" font-size="19" font-weight="bold" fill="#ffe6b0" opacity=".7">第一名</text>
-  <text x="400" y="313" text-anchor="middle" font-size="19" font-weight="bold" fill="#6e3f17">第一名</text>
+  <!-- 第一名 刻字（無邊框） -->
+  <text x="401" y="314" text-anchor="middle" font-size="21" font-weight="bold" fill="#ffe6b0" opacity=".6">第一名</text>
+  <text x="400" y="313" text-anchor="middle" font-size="21" font-weight="bold" fill="#6e3f17">第一名</text>
   <path d="M360,318 L350,340 L366,331 Z" fill="#cf8a36"/>
   <path d="M440,318 L450,340 L434,331 Z" fill="#cf8a36"/>
   ${spark(330,250,7,'#fff3c0')}${spark(470,266,6,'#ffffff')}${spark(400,230,8,'#ffe9b0')}${spark(352,300,4,'#ffffff')}${spark(452,332,5,'#fff3c0')}
@@ -784,6 +828,7 @@ function fireworksHTML(n){
 
 function renderWin(){
   clearTimer();state.screen="win";state.stageIdx=4;renderHUD();
+  sndFireworks(state.shards);
   const review={
     SSS:"複習：三邊都要標相等，才算 SSS。",
     SAS:"複習：SAS 的角必須是兩邊的『夾角』。",
@@ -828,6 +873,66 @@ function renderFarewell(){
   try{window.close();}catch(e){}
 }
 
+/* ================= 音效（Web Audio API 合成） ================= */
+const AC=new(window.AudioContext||window.webkitAudioContext)();
+
+function resumeAC(){if(AC.state==="suspended")AC.resume();}
+
+function sndCorrect(){
+  resumeAC();
+  const t=AC.currentTime;
+  [[523,.05],[659,.1],[784,.18],[1047,.28]].forEach(([f,dt])=>{
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.connect(g);g.connect(AC.destination);
+    o.type="sine";o.frequency.value=f;
+    g.gain.setValueAtTime(0,t+dt);g.gain.linearRampToValueAtTime(.22,t+dt+.03);
+    g.gain.exponentialRampToValueAtTime(.001,t+dt+.28);
+    o.start(t+dt);o.stop(t+dt+.3);
+  });
+}
+function sndWrong(){
+  resumeAC();
+  const t=AC.currentTime;
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.connect(g);g.connect(AC.destination);
+  o.type="sawtooth";o.frequency.setValueAtTime(220,t);o.frequency.linearRampToValueAtTime(140,t+.22);
+  g.gain.setValueAtTime(.18,t);g.gain.exponentialRampToValueAtTime(.001,t+.3);
+  o.start(t);o.stop(t+.32);
+}
+function sndBeep(){
+  resumeAC();
+  const t=AC.currentTime;
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.connect(g);g.connect(AC.destination);
+  o.type="square";o.frequency.value=880;
+  g.gain.setValueAtTime(.15,t);g.gain.exponentialRampToValueAtTime(.001,t+.18);
+  o.start(t);o.stop(t+.2);
+}
+function sndFireworks(n){
+  resumeAC();
+  const COLORS_N=Math.min(n,10);
+  for(let i=0;i<COLORS_N;i++){
+    const delay=i*0.42;
+    setTimeout(()=>{
+      const t=AC.currentTime;
+      // 上升哨音
+      const whistle=AC.createOscillator(),wg=AC.createGain();
+      whistle.connect(wg);wg.connect(AC.destination);
+      whistle.type="sine";whistle.frequency.setValueAtTime(400,t);whistle.frequency.linearRampToValueAtTime(1800,t+.35);
+      wg.gain.setValueAtTime(.12,t);wg.gain.exponentialRampToValueAtTime(.001,t+.38);
+      whistle.start(t);whistle.stop(t+.4);
+      // 爆炸噪音
+      const buf=AC.createBuffer(1,AC.sampleRate*.6,AC.sampleRate);
+      const ch=buf.getChannelData(0);for(let k=0;k<ch.length;k++)ch[k]=Math.random()*2-1;
+      const src=AC.createBufferSource(),bg=AC.createGain();
+      const filt=AC.createBiquadFilter();filt.type="bandpass";filt.frequency.value=800+Math.random()*600;filt.Q.value=0.6;
+      src.buffer=buf;src.connect(filt);filt.connect(bg);bg.connect(AC.destination);
+      bg.gain.setValueAtTime(.35,t+.36);bg.gain.exponentialRampToValueAtTime(.001,t+.9);
+      src.start(t+.36);src.stop(t+1);
+    },delay*1000);
+  }
+}
+
 /* ================= 共用：規則按鈕綁定 ================= */
 function bindAnswers(q,cb){
   document.querySelectorAll(".ans").forEach(b=>{
@@ -835,7 +940,7 @@ function bindAnswers(q,cb){
       document.querySelectorAll(".ans").forEach(x=>{x.disabled=true;if(x.dataset.v===q.rule)x.classList.add("correct");});
       const chosen=b.dataset.v;
       const ok=chosen===q.rule;
-      if(!ok){b.classList.add("wrong");state.errorTally[q.rule]++;}
+      if(ok){sndCorrect();}else{b.classList.add("wrong");state.errorTally[q.rule]++;sndWrong();}
       cb(ok,chosen);
     };
   });
