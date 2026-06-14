@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>幾何神探</title>
+<style>
+  :root{
+    --bg:#0f201a;--board:#142b22;--chalk:#f4f1e9;--chalk-dim:#b8c2bb;
+    --accent:#ffae42;--accent-soft:#ffce8a;--good:#7fd1ae;--bad:#ff7b72;--line:#3a5346;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg);color:var(--chalk);font-family:"Segoe UI","Microsoft JhengHei","PingFang TC",sans-serif;line-height:1.5;min-height:100vh;padding:16px 14px 60px;}
+  .wrap{max-width:880px;margin:0 auto;}
+  h1{text-align:center;font-size:2rem;margin:.1em 0;color:var(--accent);letter-spacing:3px;text-shadow:0 1px 0 rgba(0,0,0,.4);}
+  .subtitle{text-align:center;color:var(--chalk-dim);margin:.2em 0 16px;font-size:.95rem;}
+
+  .stages{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+  .stage-chip{border:1px solid var(--line);border-radius:20px;padding:4px 12px;font-size:.82rem;color:var(--chalk-dim);background:var(--board);white-space:nowrap;}
+  .stage-chip.active{border-color:var(--accent);color:var(--accent);font-weight:bold;}
+  .stage-chip.done{color:var(--good);border-color:var(--good);}
+
+  .hud{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;background:var(--board);border:1px solid var(--line);border-radius:10px;padding:8px 14px;margin-bottom:14px;font-size:.95rem;}
+  .hud b{color:var(--accent);}
+  .timer.low{color:var(--bad)!important;}
+
+  .panel{background:var(--board);border:1px solid var(--line);border-radius:14px;padding:18px;text-align:center;}
+  .prompt{font-size:1.05rem;margin:0 0 10px;}
+  .prompt strong{color:var(--accent);}
+  .given-box{background:rgba(255,255,255,.03);border:1px dashed var(--line);border-radius:10px;padding:9px 14px;margin:0 auto 12px;max-width:560px;text-align:left;font-size:.95rem;color:var(--accent-soft);}
+  .meta{color:var(--chalk-dim);font-size:.85rem;font-style:italic;margin-top:10px;}
+  .fig-row{display:flex;justify-content:center;margin:6px 0 10px;}
+  .fig-row svg{max-width:280px;width:100%;height:auto;display:block;}
+
+  details.ref{background:var(--board);border:1px solid var(--line);border-radius:12px;padding:4px 14px;margin-bottom:14px;}
+  details.ref summary{cursor:pointer;font-weight:bold;color:var(--accent-soft);padding:6px 0;list-style:none;}
+  details.ref summary::before{content:"📐 ";}
+  .ref-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;padding:8px 0 12px;}
+  .ref-card{border:1px solid var(--line);border-radius:10px;padding:10px;background:rgba(255,255,255,.02);}
+  .ref-card b{color:var(--accent);}
+  .ref-card .zh{color:var(--chalk-dim);font-size:.8rem;}
+  .ref-card p{margin:.4em 0 0;font-size:.84rem;}
+
+  .answers{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;}
+  @media(max-width:480px){.answers{grid-template-columns:repeat(2,1fr);}}
+  .ans{background:transparent;border:2px solid var(--accent);color:var(--accent-soft);border-radius:10px;padding:11px 6px;font-size:.92rem;font-weight:bold;cursor:pointer;transition:transform .08s,background .15s;font-family:inherit;}
+  .ans small{display:block;font-weight:normal;font-size:.7rem;color:var(--chalk-dim);margin-top:2px;}
+  .ans:hover:not(:disabled){background:rgba(255,174,66,.12);transform:translateY(-2px);}
+  .ans:disabled{cursor:default;}
+  .ans.correct{background:rgba(127,209,174,.18);border-color:var(--good);color:var(--good);}
+  .ans.wrong{background:rgba(255,123,114,.16);border-color:var(--bad);color:var(--bad);}
+
+  .forks{display:flex;flex-direction:column;gap:10px;max-width:520px;margin:12px auto 0;}
+  .fork{text-align:left;background:transparent;border:2px solid var(--line);color:var(--chalk);border-radius:10px;padding:11px 14px;font-size:.95rem;cursor:pointer;font-family:inherit;}
+  .fork:hover:not(:disabled){border-color:var(--accent);background:rgba(255,174,66,.08);}
+  .fork.correct{border-color:var(--good);color:var(--good);background:rgba(127,209,174,.14);}
+  .fork.wrong{border-color:var(--bad);color:var(--bad);background:rgba(255,123,114,.12);}
+  .fork:disabled{cursor:default;}
+
+  .feedback{margin-top:12px;min-height:24px;text-align:left;max-width:600px;margin-left:auto;margin-right:auto;}
+  .verdict{font-weight:bold;font-size:1.05rem;}
+  .verdict.ok{color:var(--good);}
+  .verdict.no{color:var(--bad);}
+  .why{color:var(--chalk-dim);margin-top:4px;font-size:.92rem;}
+
+  .controls{margin-top:14px;}
+  .btn{background:var(--accent);color:#2a1c05;border:none;border-radius:10px;padding:11px 28px;font-size:1rem;font-weight:bold;cursor:pointer;font-family:inherit;}
+  .btn:hover{background:var(--accent-soft);}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--chalk-dim);}
+  .hidden{display:none;}
+
+  .countdown-bar{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px;}
+  .countdown-num{font-size:2.8rem;font-weight:bold;color:var(--good);font-variant-numeric:tabular-nums;line-height:1;min-width:62px;text-align:center;transition:color .2s;}
+  .countdown-num.warn{color:var(--bad);animation:cpulse .5s ease-in-out infinite alternate;}
+  @keyframes cpulse{from{transform:scale(1);}to{transform:scale(1.18);}}
+  .countdown-track{flex:1;max-width:260px;height:7px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;}
+  .countdown-fill{height:100%;background:var(--good);border-radius:4px;transition:width .9s linear,background .3s;}
+  .countdown-fill.warn{background:var(--bad);}
+  .monster{font-size:2.4rem;transition:transform .25s,opacity .25s;height:42px;}
+  .monster.pop{transform:scale(1.6) rotate(20deg);opacity:0;}
+
+  .badge{font-size:4rem;}
+  .big{font-size:2.4rem;color:var(--accent);font-weight:bold;}
+  .review{text-align:left;max-width:520px;margin:12px auto;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:12px 16px;}
+  .review h3{margin:.2em 0;color:var(--accent-soft);font-size:1rem;}
+  .review li{color:var(--chalk-dim);font-size:.9rem;margin:4px 0;}
+  .win-title{text-align:center;font-size:1.3rem;color:var(--accent);font-weight:bold;margin:0 0 12px;}
+  .scene-wrap{position:relative;max-width:760px;margin:0 auto;border-radius:14px;overflow:hidden;box-shadow:0 12px 36px rgba(0,0,0,.55);border:1px solid var(--line);}
+  .scene-wrap svg.scene{width:100%;height:auto;display:block;}
+  .fw-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+  .firework{position:absolute;width:0;height:0;}
+  .firework span{position:absolute;left:0;top:0;width:5px;height:5px;border-radius:50%;background:var(--fc);box-shadow:0 0 9px 2px var(--fc);opacity:0;transform:rotate(var(--a)) translateY(0) scale(1);animation:fwburst 1.9s ease-out infinite;animation-delay:var(--dl);}
+  @keyframes fwburst{0%,5%{transform:rotate(var(--a)) translateY(0) scale(.6);opacity:0;}12%{opacity:1;}55%{opacity:1;}100%{transform:rotate(var(--a)) translateY(var(--d)) scale(.25);opacity:0;}}
+  .win-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+  .numin{font-size:1.2rem;width:110px;text-align:center;padding:8px;border-radius:8px;border:2px solid var(--accent);background:var(--bg);color:var(--chalk);font-family:inherit;}
+  .unit{font-size:1.1rem;color:var(--chalk-dim);margin-left:6px;}
+  .hint{text-align:center;color:var(--chalk-dim);font-size:.78rem;margin-top:16px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔍 幾何神探</h1>
+  <p class="subtitle">中垂線 · 角平分線 · 外心 · 內心 — 看圖識性質</p>
+
+  <details class="ref">
+    <summary>性質速覽（隨時可開）</summary>
+    <div class="ref-grid">
+      <div class="ref-card"><b>中垂線性質</b><p>P 在 AB 中垂線上<br>⟹ <b style="color:var(--accent-soft)">PA = PB</b></p></div>
+      <div class="ref-card"><b>中垂線逆定理</b><p>PA = PB<br>⟹ P 在 <b style="color:var(--accent-soft)">AB 中垂線上</b></p></div>
+      <div class="ref-card"><b>角平分線性質</b><p>P 在 ∠AOB 角平分線上<br>⟹ P 到<b style="color:var(--accent-soft)">兩邊等距</b></p></div>
+      <div class="ref-card"><b>角平分線逆定理</b><p>P 在角內且到兩邊等距<br>⟹ P 在<b style="color:var(--accent-soft)">角平分線上</b></p></div>
+      <div class="ref-card"><b>外心</b><p>三邊中垂線交於外心 O<br>⟹ <b style="color:var(--accent-soft)">OA = OB = OC</b>（外接圓半徑）</p></div>
+      <div class="ref-card"><b>內心</b><p>三角平分線交於內心 I<br>⟹ I 到<b style="color:var(--accent-soft)">三邊等距</b>（內切圓半徑）</p></div>
+    </div>
+  </details>
+
+  <div class="stages" id="stages"></div>
+  <div class="hud" id="hud"></div>
+  <div id="stage"></div>
+  <p class="hint">鍵盤 1–6 作答 · Enter 下一題</p>
+</div>
+
+<script>
+/* ===== SVG 繪圖工具 ===== */
+const W=260,H=210;
+function mk(body){return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;}
+function seg(x1,y1,x2,y2,c='var(--chalk)',sw=2.4,dash=''){
+  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${sw}" stroke-linecap="round"${dash?` stroke-dasharray="${dash}"`:''}/>`;}
+function dot(x,y,r=4.5,fill='var(--chalk)'){return `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}"/>`;}
+function lbl(x,y,t,dx=0,dy=0,size=14){return `<text x="${x+dx}" y="${y+dy}" text-anchor="middle" font-size="${size}" font-weight="bold" fill="var(--chalk)">${t}</text>`;}
+function tickSeg(x1,y1,x2,y2,n=1){
+  const mx=(x1+x2)/2,my=(y1+y2)/2,l=Math.hypot(x2-x1,y2-y1)||1;
+  const ux=(x2-x1)/l,uy=(y2-y1)/l,px=-uy,py=ux,L=7,g=5;
+  let s='';for(let i=0;i<n;i++){const o=(i-(n-1)/2)*g,cx=mx+ux*o,cy=my+uy*o;
+    s+=`<line x1="${(cx+px*L/2).toFixed(1)}" y1="${(cy+py*L/2).toFixed(1)}" x2="${(cx-px*L/2).toFixed(1)}" y2="${(cy-py*L/2).toFixed(1)}" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/>`;} return s;}
+function raMark(Vx,Vy,Px,Py,Qx,Qy,sz=11){
+  const l1=Math.hypot(Px-Vx,Py-Vy)||1,l2=Math.hypot(Qx-Vx,Qy-Vy)||1;
+  const u1x=(Px-Vx)/l1,u1y=(Py-Vy)/l1,u2x=(Qx-Vx)/l2,u2y=(Qy-Vy)/l2;
+  const ax=Vx+u1x*sz,ay=Vy+u1y*sz,cx=Vx+u2x*sz,cy=Vy+u2y*sz;
+  return `<path d="M${ax.toFixed(1)},${ay.toFixed(1)} L${(ax+u2x*sz).toFixed(1)},${(ay+u2y*sz).toFixed(1)} L${cx.toFixed(1)},${cy.toFixed(1)}" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
+}
+function arcMark(Vx,Vy,Px,Py,Qx,Qy,n=1,rb=20){
+  const a0=Math.atan2(Py-Vy,Px-Vx),a1=Math.atan2(Qy-Vy,Qx-Vx);
+  let da=a1-a0;while(da>Math.PI)da-=2*Math.PI;while(da<-Math.PI)da+=2*Math.PI;
+  let s='';for(let k=0;k<n;k++){const r=rb+k*5;let path='';
+    for(let i=0;i<=16;i++){const a=a0+da*i/16;path+=(i?'L':'M')+`${(Vx+Math.cos(a)*r).toFixed(1)},${(Vy+Math.sin(a)*r).toFixed(1)} `;}
+    s+=`<path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.2"/>`;} return s;}
+function footPt(Px,Py,Ax,Ay,Bx,By){
+  const dx=Bx-Ax,dy=By-Ay,t=((Px-Ax)*dx+(Py-Ay)*dy)/(dx*dx+dy*dy);
+  return[Ax+t*dx,Ay+t*dy];}
+
+/* ===== 圖形繪製函式 ===== */
+// 1. 中垂線性質（P在中垂線上 → PA=PB）
+function figPerpProp(){
+  const A=[40,158],B=[218,158],M=[129,158],P=[129,55];
+  return mk(
+    seg(A[0],A[1],B[0],B[1])+
+    seg(129,18,129,182,'var(--chalk-dim)',1.5,'5,4')+
+    raMark(M[0],M[1],P[0],P[1],B[0],B[1])+
+    dot(A[0],A[1])+lbl(A[0],A[1],'A',-14,5)+
+    dot(B[0],B[1])+lbl(B[0],B[1],'B',14,5)+
+    dot(M[0],M[1])+lbl(M[0],M[1],'M',0,18)+
+    dot(P[0],P[1])+lbl(P[0],P[1],'P',0,-12)
+  );}
+// 2. 中垂線逆定理（PA=PB → P在中垂線上）
+function figPerpInv(){
+  const A=[48,172],B=[210,172],P=[110,52];
+  return mk(
+    seg(A[0],A[1],B[0],B[1])+
+    seg(A[0],A[1],P[0],P[1])+tickSeg(A[0],A[1],P[0],P[1],1)+
+    seg(B[0],B[1],P[0],P[1])+tickSeg(B[0],B[1],P[0],P[1],1)+
+    dot(A[0],A[1])+lbl(A[0],A[1],'A',-13,5)+
+    dot(B[0],B[1])+lbl(B[0],B[1],'B',13,5)+
+    dot(P[0],P[1])+lbl(P[0],P[1],'P',0,-12)
+  );}
+// 3. 角平分線性質（P在角平分線上 → 到兩邊等距）
+function figAngProp(){
+  // O=[32,180], R1=[220,60], R2=[220,180]
+  // 真正角平分線方向 = unit(OR1)+unit(OR2) → End=[224,124]，P 在平分線上 t=110 → [138,149]
+  const O=[32,180],R1=[220,60],R2=[220,180],End=[224,124],P=[138,149];
+  return mk(
+    seg(O[0],O[1],R1[0],R1[1])+
+    seg(O[0],O[1],R2[0],R2[1])+
+    seg(O[0],O[1],End[0],End[1],'var(--chalk-dim)',1.6,'4,3')+
+    arcMark(O[0],O[1],R1[0],R1[1],End[0],End[1],1)+
+    arcMark(O[0],O[1],End[0],End[1],R2[0],R2[1],1)+
+    dot(O[0],O[1])+lbl(O[0],O[1],'O',-13,0)+
+    dot(P[0],P[1])+lbl(P[0],P[1],'P',0,-12)+
+    lbl(O[0]+40,O[1]-15,'∠1',0,0,12)+lbl(O[0]+40,O[1]+14,'∠1',0,0,12)
+  );}
+// 4. 角平分線逆定理（到兩邊等距 → P在角平分線上）
+function figAngInv(){
+  // P 在角平分線上才能使 PF1=PF2 幾何正確（P=[138,149] 使 PF1≈PF2≈31）
+  const O=[32,180],R1=[220,60],R2=[220,180],P=[138,149];
+  const F1=footPt(P[0],P[1],O[0],O[1],R1[0],R1[1]);
+  const F2=footPt(P[0],P[1],O[0],O[1],R2[0],R2[1]);
+  return mk(
+    seg(O[0],O[1],R1[0],R1[1])+
+    seg(O[0],O[1],R2[0],R2[1])+
+    seg(P[0],P[1],F1[0],F1[1],'var(--chalk-dim)',1.6,'3,3')+
+    seg(P[0],P[1],F2[0],F2[1],'var(--chalk-dim)',1.6,'3,3')+
+    tickSeg(P[0],P[1],F1[0],F1[1],1)+tickSeg(P[0],P[1],F2[0],F2[1],1)+
+    raMark(F1[0],F1[1],O[0],O[1],P[0],P[1])+
+    raMark(F2[0],F2[1],O[0],O[1],P[0],P[1])+
+    dot(O[0],O[1])+lbl(O[0],O[1],'O',-13,0)+
+    dot(P[0],P[1])+lbl(P[0],P[1],'P',12,-6)+
+    dot(F1[0],F1[1],3.5)+dot(F2[0],F2[1],3.5)
+  );}
+// 5. 外心（三中垂線交點）
+function figCircum(){
+  const A=[42,180],B=[218,180],C=[155,45],O=[130,115];
+  const mx1=(A[0]+B[0])/2,my1=(A[1]+B[1])/2;
+  const mx2=(A[0]+C[0])/2,my2=(A[1]+C[1])/2;
+  return mk(
+    seg(A[0],A[1],B[0],B[1])+seg(B[0],B[1],C[0],C[1])+seg(C[0],C[1],A[0],A[1])+
+    seg(O[0],A[0],O[1],A[1])+tickSeg(O[0],O[1],A[0],A[1],1)+
+    seg(O[0],B[0],O[1],B[1])+tickSeg(O[0],O[1],B[0],B[1],1)+
+    seg(O[0],C[0],O[1],C[1])+tickSeg(O[0],O[1],C[0],C[1],1)+
+    raMark(mx1,my1,O[0],O[1],B[0],B[1])+
+    dot(A[0],A[1])+lbl(A[0],A[1],'A',-13,5)+
+    dot(B[0],B[1])+lbl(B[0],B[1],'B',13,5)+
+    dot(C[0],C[1])+lbl(C[0],C[1],'C',0,-12)+
+    dot(O[0],O[1],5,'var(--accent)')+lbl(O[0],O[1],'O',14,0)
+  );}
+// 6. 內心（三角平分線交點）
+function figIncen(){
+  const A=[42,185],B=[218,185],C=[165,42],I=[138,132];
+  const F1=footPt(I[0],I[1],A[0],A[1],B[0],B[1]);
+  const F2=footPt(I[0],I[1],B[0],B[1],C[0],C[1]);
+  return mk(
+    seg(A[0],A[1],B[0],B[1])+seg(B[0],B[1],C[0],C[1])+seg(C[0],C[1],A[0],A[1])+
+    seg(I[0],I[1],F1[0],F1[1],'var(--chalk-dim)',1.5,'3,3')+tickSeg(I[0],I[1],F1[0],F1[1],1)+
+    seg(I[0],I[1],F2[0],F2[1],'var(--chalk-dim)',1.5,'3,3')+tickSeg(I[0],I[1],F2[0],F2[1],1)+
+    raMark(F1[0],F1[1],A[0],A[1],I[0],I[1])+
+    raMark(F2[0],F2[1],B[0],B[1],I[0],I[1])+
+    dot(A[0],A[1])+lbl(A[0],A[1],'A',-13,5)+
+    dot(B[0],B[1])+lbl(B[0],B[1],'B',13,5)+
+    dot(C[0],C[1])+lbl(C[0],C[1],'C',12,-6)+
+    dot(I[0],I[1],5,'var(--accent)')+lbl(I[0],I[1],'I',-14,0)
+  );}
+// 7. 陷阱：只有中點，沒有垂直
+function figTrapMid(){
+  const A=[42,140],B=[218,140],M=[130,140],P=[90,68];
+  return mk(
+    seg(A[0],A[1],B[0],B[1])+
+    tickSeg(A[0],A[1],M[0],M[1],1)+tickSeg(M[0],M[1],B[0],B[1],1)+
+    dot(A[0],A[1])+lbl(A[0],A[1],'A',-13,5)+
+    dot(B[0],B[1])+lbl(B[0],B[1],'B',13,5)+
+    dot(M[0],M[1])+lbl(M[0],M[1],'M',0,18)+
+    dot(P[0],P[1])+lbl(P[0],P[1],'P',0,-12)+
+    `<text x="130" y="192" text-anchor="middle" font-size="11" fill="var(--chalk-dim)">（無垂直標記）</text>`
+  );}
+// 8. 陷阱：看起來像角平分線，但距離不等
+function figTrapAng(){
+  const O=[35,180],R1=[220,65],R2=[220,185];
+  const bx=(R1[0]+R2[0])/2-O[0],by=(R1[1]+R2[1])/2-O[1],bl=Math.hypot(bx,by);
+  const End=[O[0]+bx/bl*210,O[1]+by/bl*210];
+  const P=[148,118];
+  const F1=footPt(P[0],P[1],O[0],O[1],R1[0],R1[1]);
+  const F2=footPt(P[0],P[1],O[0],O[1],R2[0],R2[1]);
+  return mk(
+    seg(O[0],O[1],R1[0],R1[1])+seg(O[0],O[1],R2[0],R2[1])+
+    seg(P[0],P[1],F1[0],F1[1],'var(--chalk-dim)',1.5,'3,3')+
+    seg(P[0],P[1],F2[0],F2[1],'var(--chalk-dim)',1.5,'3,3')+
+    tickSeg(P[0],P[1],F1[0],F1[1],1)+tickSeg(P[0],P[1],F2[0],F2[1],2)+
+    raMark(F1[0],F1[1],O[0],O[1],P[0],P[1])+
+    raMark(F2[0],F2[1],O[0],O[1],P[0],P[1])+
+    dot(O[0],O[1])+lbl(O[0],O[1],'O',-13,0)+
+    dot(P[0],P[1])+lbl(P[0],P[1],'P',12,-6)+
+    `<text x="130" y="202" text-anchor="middle" font-size="11" fill="var(--bad)">注意：刻線數不同！</text>`
+  );}
+// 9. 中垂線性質（另一方向：P在斜中垂線上）
+function figPerpProp2(){
+  // P=[108,83] 落在中垂線（過M=[131,116]、方向perp向量）上，驗算 t≈50 ✓
+  const A=[52,172],B=[210,60],M=[(52+210)/2,(172+60)/2],P=[108,83];
+  const len=Math.hypot(B[0]-A[0],B[1]-A[1]),ux=(B[0]-A[0])/len,uy=(B[1]-A[1])/len;
+  const px=-uy,py=ux;
+  const E1=[M[0]-px*90,M[1]-py*90],E2=[M[0]+px*90,M[1]+py*90];
+  return mk(
+    seg(A[0],A[1],B[0],B[1])+
+    seg(E1[0],E1[1],E2[0],E2[1],'var(--chalk-dim)',1.5,'5,4')+
+    raMark(M[0],M[1],E1[0],E1[1],B[0],B[1])+
+    dot(A[0],A[1])+lbl(A[0],A[1],'A',-13,5)+
+    dot(B[0],B[1])+lbl(B[0],B[1],'B',13,-8)+
+    dot(M[0],M[1])+lbl(M[0],M[1],'M',13,0)+
+    dot(P[0],P[1])+lbl(P[0],P[1],'P',0,-14)
+  );}
+// 10. 中垂線逆定理 v2（等邊三角形情境）
+function figPerpInv2(){
+  const A=[48,175],B=[210,175],P=[164,72];
+  return mk(
+    seg(A[0],A[1],B[0],B[1])+
+    seg(A[0],A[1],P[0],P[1])+tickSeg(A[0],A[1],P[0],P[1],2)+
+    seg(B[0],B[1],P[0],P[1])+tickSeg(B[0],B[1],P[0],P[1],2)+
+    dot(A[0],A[1])+lbl(A[0],A[1],'A',-13,5)+
+    dot(B[0],B[1])+lbl(B[0],B[1],'B',13,5)+
+    dot(P[0],P[1])+lbl(P[0],P[1],'P',0,-12)
+  );}
+// 11. 角平分線性質 v2（三角形內角平分線情境）
+function figAngProp2(){
+  const A=[38,180],B=[218,180],C=[148,44];
+  const Ic=[134,130]; // approximate incenter-like point
+  const bx=(A[0]+B[0]+C[0])/3-A[0],by=(A[1]+B[1]+C[1])/3-A[1];
+  const ABmid=[(A[0]+B[0])/2,(A[1]+B[1])/2];
+  return mk(
+    seg(A[0],A[1],B[0],B[1])+seg(B[0],B[1],C[0],C[1])+seg(C[0],C[1],A[0],A[1])+
+    seg(A[0],A[1],ABmid[0]+60,ABmid[1]-60,'var(--chalk-dim)',1.5,'4,3')+
+    arcMark(A[0],A[1],B[0],B[1],C[0],C[1],1,22)+
+    arcMark(A[0],A[1],ABmid[0]+60,ABmid[1]-60,C[0],C[1],1,22)+
+    dot(A[0],A[1])+lbl(A[0],A[1],'A',-13,5)+
+    dot(B[0],B[1])+lbl(B[0],B[1],'B',13,5)+
+    dot(C[0],C[1])+lbl(C[0],C[1],'C',0,-12)+
+    dot(ABmid[0]+60,ABmid[1]-60,3.5)+lbl(ABmid[0]+60,ABmid[1]-60,'D',10,-6)
+  );}
+// 12. 外心 v2（標示外接圓）
+function figCircum2(){
+  const A=[52,172],B=[210,172],C=[178,52],O=[140,110];
+  const r=Math.hypot(O[0]-A[0],O[1]-A[1]);
+  return mk(
+    `<circle cx="${O[0]}" cy="${O[1]}" r="${r.toFixed(1)}" fill="none" stroke="var(--chalk-dim)" stroke-width="1.3" stroke-dasharray="4,4"/>` +
+    seg(A[0],A[1],B[0],B[1])+seg(B[0],B[1],C[0],C[1])+seg(C[0],C[1],A[0],A[1])+
+    tickSeg(O[0],O[1],A[0],A[1],1)+tickSeg(O[0],O[1],B[0],B[1],1)+tickSeg(O[0],O[1],C[0],C[1],1)+
+    dot(A[0],A[1])+lbl(A[0],A[1],'A',-13,5)+
+    dot(B[0],B[1])+lbl(B[0],B[1],'B',13,5)+
+    dot(C[0],C[1])+lbl(C[0],C[1],'C',13,-6)+
+    dot(O[0],O[1],5,'var(--accent)')+lbl(O[0],O[1],'O',-14,0)
+  );}
+
+/* ===== 題庫 ===== */
+const RULE_INFO={
+  PERP_PROP:{short:"PA = PB",zh:"中垂線性質"},
+  PERP_INV: {short:"P 在中垂線上",zh:"中垂線逆定理"},
+  ANG_PROP: {short:"到兩邊等距",zh:"角平分線性質"},
+  ANG_INV:  {short:"P 在角平分線上",zh:"角平分線逆定理"},
+  CIRCUM:   {short:"OA = OB = OC",zh:"外心性質"},
+  NONE:     {short:"無法判定",zh:"條件不足"}
+};
+const OPTS=[
+  {v:"PERP_PROP"},{v:"PERP_INV"},{v:"ANG_PROP"},
+  {v:"ANG_INV"},{v:"CIRCUM"},{v:"NONE"}
+];
+
+const BANK=[
+  {rule:"PERP_PROP",figFn:figPerpProp,
+   given:"P 在 AB 的中垂線上（直角標記）",
+   why:"中垂線性質：中垂線上的點到兩端點距離相等，故 PA = PB。"},
+  {rule:"PERP_PROP",figFn:figPerpProp2,
+   given:"P 在 AB 的中垂線上（斜線情境）",
+   why:"中垂線性質不受方向影響：P 在中垂線上 ⟹ PA = PB。"},
+  {rule:"PERP_INV",figFn:figPerpInv,
+   given:"圖中 PA = PB（1 條刻線相同）",
+   why:"中垂線逆定理：到兩端點等距的點，必在線段中垂線上。"},
+  {rule:"PERP_INV",figFn:figPerpInv2,
+   given:"圖中 PA = PB（2 條刻線相同）",
+   why:"刻線數相同代表等距，PA = PB ⟹ P 在 AB 中垂線上。"},
+  {rule:"ANG_PROP",figFn:figAngProp,
+   given:"P 在 ∠AOB 角平分線上（等弧標記）",
+   why:"角平分線性質：角平分線上的點到角的兩邊距離相等。"},
+  {rule:"ANG_PROP",figFn:figAngProp2,
+   given:"AD 平分 ∠BAC（等弧標記）",
+   why:"三角形內角平分線也適用同一性質：AD 上的點到 AB、AC 等距。"},
+  {rule:"ANG_INV",figFn:figAngInv,
+   given:"P 在角內且到兩邊的距離相等（刻線相同）",
+   why:"角平分線逆定理：角內到兩邊等距的點，在角平分線上。"},
+  {rule:"CIRCUM",figFn:figCircum,
+   given:"O 是 △ABC 三邊中垂線的交點（外心）",
+   why:"外心定義：三邊中垂線交點，到三頂點距離相等，即 OA = OB = OC（外接圓半徑）。"},
+  {rule:"CIRCUM",figFn:figCircum2,
+   given:"O 為 △ABC 外接圓圓心，標有等長刻線",
+   why:"外接圓圓心就是外心，到三頂點距離皆等於半徑，OA = OB = OC。"},
+  {rule:"NONE",figFn:figTrapMid,
+   given:"M 是 AB 的中點，P 是圖上另一點（無垂直標記）",
+   why:"陷阱！只知 M 是中點，不知 P 與中垂線的關係，無法判定 PA = PB。"},
+  {rule:"NONE",figFn:figTrapAng,
+   given:"P 到兩邊的距離不相等（刻線數不同！）",
+   why:"陷阱！刻線數 1 ≠ 2，兩段長度不等，無法說 P 在角平分線上。"},
+  {rule:"PERP_PROP",figFn:figPerpProp,
+   given:"P 在線段 AB 的中垂線上，M 為 AB 中點",
+   why:"P 在中垂線上 ⟹ PA = PB，與 M 是中點是兩件事，但 PA = PB 仍成立。"}
+];
+
+const VILLAGE_ORDER=["PERP_PROP","PERP_INV","ANG_PROP","ANG_INV"];
+const VILLAGE_META={
+  PERP_PROP:"後設思考：為什麼垂直平分線上的點到兩端點一定等距？",
+  PERP_INV:"後設思考：只知道 PA = PB，能確定 P 在 AB 的「中點」嗎？",
+  ANG_PROP:"後設思考：到兩邊「等距」，這距離指的是垂直距離還是斜距離？",
+  ANG_INV:"後設思考：P 在角「外部」且到兩邊等距，還在角平分線上嗎？"
+};
+
+/* ===== 音效 ===== */
+const AC=new(window.AudioContext||window.webkitAudioContext)();
+function resumeAC(){if(AC.state==="suspended")AC.resume();}
+function sndCorrect(){
+  resumeAC();const t=AC.currentTime;
+  [[523,.05],[659,.1],[784,.18],[1047,.28]].forEach(([f,dt])=>{
+    const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);
+    o.type="sine";o.frequency.value=f;
+    g.gain.setValueAtTime(0,t+dt);g.gain.linearRampToValueAtTime(.22,t+dt+.03);
+    g.gain.exponentialRampToValueAtTime(.001,t+dt+.28);o.start(t+dt);o.stop(t+dt+.3);});}
+function sndWrong(){
+  resumeAC();const t=AC.currentTime;
+  const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);
+  o.type="sawtooth";o.frequency.setValueAtTime(220,t);o.frequency.linearRampToValueAtTime(140,t+.22);
+  g.gain.setValueAtTime(.18,t);g.gain.exponentialRampToValueAtTime(.001,t+.3);o.start(t);o.stop(t+.32);}
+function sndBeep(){
+  resumeAC();const t=AC.currentTime;
+  const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);
+  o.type="square";o.frequency.value=880;
+  g.gain.setValueAtTime(.15,t);g.gain.exponentialRampToValueAtTime(.001,t+.18);o.start(t);o.stop(t+.2);}
+function sndFireworks(n){
+  resumeAC();
+  const FX_COLORS=['#ff4d6d','#ffd166','#4cc9f0','#06d6a0','#c77dff','#f72585','#ffb703','#80ffdb','#ff7b00','#b5179e'];
+  for(let i=0;i<Math.min(n,10);i++){
+    setTimeout(()=>{
+      const t=AC.currentTime;
+      const w=AC.createOscillator(),wg=AC.createGain();w.connect(wg);wg.connect(AC.destination);
+      w.type="sine";w.frequency.setValueAtTime(400,t);w.frequency.linearRampToValueAtTime(1800,t+.35);
+      wg.gain.setValueAtTime(.12,t);wg.gain.exponentialRampToValueAtTime(.001,t+.38);w.start(t);w.stop(t+.4);
+      const buf=AC.createBuffer(1,Math.floor(AC.sampleRate*.6),AC.sampleRate);
+      const ch=buf.getChannelData(0);for(let k=0;k<ch.length;k++)ch[k]=Math.random()*2-1;
+      const src=AC.createBufferSource(),bg=AC.createGain(),filt=AC.createBiquadFilter();
+      filt.type="bandpass";filt.frequency.value=800+Math.random()*600;filt.Q.value=0.6;
+      src.buffer=buf;src.connect(filt);filt.connect(bg);bg.connect(AC.destination);
+      bg.gain.setValueAtTime(.35,t+.36);bg.gain.exponentialRampToValueAtTime(.001,t+.9);src.start(t+.36);src.stop(t+1);
+    },i*420);}
+}
+
+/* ===== 遊戲狀態 ===== */
+const STAGES=[{key:"village",label:"🟢 新手村"},{key:"level1",label:"🟡 配對挑戰"},{key:"level2",label:"🔵 證明迷宮"},{key:"boss",label:"🔴 Boss"}];
+const state={screen:"start",stageIdx:0,shards:0,errorTally:{PERP_PROP:0,PERP_INV:0,ANG_PROP:0,ANG_INV:0,CIRCUM:0,NONE:0},
+  timerId:null,vIdx:0,village:[],l1Time:60,l1Defeat:0,mIdx:0,maze:null,boss:null,bossAngle:0,bossPart:0};
+const L1_TOTAL=60;
+
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function clearTimer(){if(state.timerId){clearInterval(state.timerId);state.timerId=null;}}
+
+function buildVillage(){
+  return VILLAGE_ORDER.map(r=>shuffle(BANK.filter(q=>q.rule===r))[0]);
+}
+
+/* ===== 渲染工具 ===== */
+const $stage=document.getElementById("stage");
+function renderHUD(){
+  document.getElementById("stages").innerHTML=STAGES.map((s,i)=>{
+    let cls="stage-chip";
+    if(i<state.stageIdx)cls+=" done";
+    else if(i===state.stageIdx&&state.screen!=="start"&&state.screen!=="win")cls+=" active";
+    return`<span class="${cls}">${s.label}</span>`;
+  }).join("");
+  let hud=`<span>🔺 碎片 <b>${state.shards}</b></span>`;
+  if(state.screen==="level1")hud+=`<span class="timer${state.l1Time<=10?" low":""}" id="timerDisp">⏱️ ${state.l1Time}s</span><span>擊倒 <b>${state.l1Defeat}</b></span>`;
+  document.getElementById("hud").innerHTML=hud;
+}
+function answersHTML(){
+  return`<div class="answers">`+OPTS.map(o=>{
+    const ri=RULE_INFO[o.v];
+    return`<button class="ans" data-v="${o.v}">${ri.short}<small>${ri.zh}</small></button>`;
+  }).join("")+`</div>`;}
+function bindAnswers(q,cb){
+  document.querySelectorAll(".ans").forEach(b=>{
+    b.onclick=()=>{
+      document.querySelectorAll(".ans").forEach(x=>{x.disabled=true;if(x.dataset.v===q.rule)x.classList.add("correct");});
+      const chosen=b.dataset.v,ok=chosen===q.rule;
+      if(ok){sndCorrect();}else{b.classList.add("wrong");state.errorTally[q.rule]++;sndWrong();}
+      cb(ok,chosen);
+    };
+  });}
+function updateCountdownUI(){
+  const t=state.l1Time,warn=t<=5;
+  const hd=document.getElementById("timerDisp");
+  if(hd){hd.textContent=`⏱️ ${t}s`;hd.className="timer"+(t<=10?" low":"");}
+  const num=document.getElementById("cdNum"),fill=document.getElementById("cdFill");
+  if(num){num.textContent=t;num.className="countdown-num"+(warn?" warn":"");}
+  if(fill){fill.style.width=`${(t/L1_TOTAL)*100}%`;fill.className="countdown-fill"+(warn?" warn":"");}
+}
+
+/* ===== 🟢 新手村 ===== */
+function renderVillage(){
+  clearTimer();state.screen="village";renderHUD();
+  const q=state.village[state.vIdx];
+  $stage.innerHTML=`<div class="panel">
+    <p class="prompt">新手村 第 ${state.vIdx+1}/${state.village.length} 課 —— 圖中用的是<strong>哪個性質</strong>？</p>
+    <div class="fig-row">${q.figFn()}</div>
+    <div class="given-box">📌 已知：${q.given}</div>
+    ${answersHTML()}
+    <div class="feedback" id="fb"></div>
+    <div class="meta">${VILLAGE_META[q.rule]}</div>
+    <div class="controls"><button class="btn hidden" id="next">收下碎片 ▶</button></div>
+  </div>`;
+  bindAnswers(q,(ok)=>{
+    const ri=RULE_INFO[q.rule];
+    document.getElementById("fb").innerHTML=ok
+      ?`<div class="verdict ok">✔ ${ri.short}（${ri.zh}）！獲得一塊碎片 🔺</div><div class="why">${q.why}</div>`
+      :`<div class="verdict no">答案是「${ri.short}」（${ri.zh}）</div><div class="why">${q.why}</div>`;
+    if(ok)state.shards++;renderHUD();
+    document.getElementById("next").classList.remove("hidden");
+  });
+  document.getElementById("next").onclick=()=>{
+    state.vIdx++;
+    if(state.vIdx>=state.village.length){state.stageIdx=1;renderLevel1Intro();}
+    else renderVillage();
+  };
+}
+
+/* ===== 🟡 配對挑戰 ===== */
+function renderLevel1Intro(){
+  clearTimer();state.screen="intro";renderHUD();
+  $stage.innerHTML=`<div class="panel">
+    <p class="big">🟡 配對挑戰</p>
+    <p class="prompt">限時 <strong>60 秒</strong>！看圖判斷應用哪個性質，擊倒每隻幾何怪物 👾。<br>小心陷阱題，條件不足就選「無法判定」。</p>
+    <div class="controls"><button class="btn" id="go">開始（60 秒）▶</button></div>
+  </div>`;
+  document.getElementById("go").onclick=()=>{state.l1Time=60;state.l1Defeat=0;startL1Timer();nextLevel1();};
+}
+function startL1Timer(){
+  clearTimer();
+  state.timerId=setInterval(()=>{
+    state.l1Time--;updateCountdownUI();
+    if(state.l1Time<=5&&state.l1Time>0)sndBeep();
+    if(state.l1Time<=0){clearTimer();renderLevel1Done();}
+  },1000);
+}
+function nextLevel1(){
+  state.screen="level1";renderHUD();
+  const q=shuffle(BANK)[0];
+  $stage.innerHTML=`<div class="panel">
+    <div class="countdown-bar">
+      <div class="countdown-num" id="cdNum">${state.l1Time}</div>
+      <div class="countdown-track"><div class="countdown-fill" id="cdFill" style="width:${(state.l1Time/L1_TOTAL)*100}%"></div></div>
+      <span style="color:var(--chalk-dim);font-size:.9rem">秒</span>
+    </div>
+    <div class="monster" id="mon">👾</div>
+    <div class="fig-row">${q.figFn()}</div>
+    <div class="given-box">📌 ${q.given}</div>
+    ${answersHTML()}
+    <div class="feedback" id="fb"></div>
+    <div class="controls"><button class="btn hidden" id="next">繼續 ▶</button></div>
+  </div>`;
+  bindAnswers(q,(ok)=>{
+    if(ok){
+      state.l1Defeat++;renderHUD();
+      document.getElementById("mon").classList.add("pop");
+      document.getElementById("fb").innerHTML=`<div class="verdict ok">✔ 擊倒！${RULE_INFO[q.rule].zh}</div>`;
+      setTimeout(()=>{if(state.screen==="level1"&&state.l1Time>0)nextLevel1();},700);
+    }else{
+      document.getElementById("fb").innerHTML=`<div class="verdict no">✘ 正確：${RULE_INFO[q.rule].short}</div><div class="why">${q.why}</div>`;
+      document.getElementById("next").classList.remove("hidden");
+    }
+  });
+  document.getElementById("next").onclick=()=>{if(state.l1Time>0)nextLevel1();else renderLevel1Done();};
+}
+function renderLevel1Done(){
+  clearTimer();state.screen="intro";renderHUD();
+  $stage.innerHTML=`<div class="panel">
+    <p class="big">⏱️ 時間到！</p>
+    <p class="prompt">你擊倒了 <strong>${state.l1Defeat}</strong> 隻幾何怪物 👾</p>
+    <div class="controls"><button class="btn" id="go">前往證明迷宮 ▶</button></div>
+  </div>`;
+  document.getElementById("go").onclick=()=>{state.stageIdx=2;state.mIdx=0;renderLevel2();};
+}
+
+/* ===== 🔵 證明迷宮 ===== */
+const MAZES=[
+  {given:"已知：P 在 AB 中垂線上。　目標：證明 △PAO ≅ △PBO（O 為 AB 中點）。",steps:[
+    {q:"第一步，利用中垂線性質可得什麼？",opts:[
+      {t:"PA = PB",ok:true},{t:"PO = AO",ok:false,hint:"PO 不直接從中垂線性質得出。"},{t:"∠APO = ∠BPO",ok:false,hint:"這個結論需要先建立 PA = PB 後才能推導。"}]},
+    {q:"O 是 AB 中點，可知什麼？",opts:[
+      {t:"AO = BO",ok:true},{t:"PO ⊥ AB",ok:false,hint:"垂直關係需要另外說明。"},{t:"∠PAO = 90°",ok:false,hint:"不一定是直角。"}]},
+    {q:"利用以上條件加上 PO = PO（公共邊），用哪個判定可證 △PAO ≅ △PBO？",opts:[
+      {t:"SSS（三邊相等）",ok:true},{t:"SAS（兩邊及夾角）",ok:false,hint:"沒有夾角的條件。"},{t:"ASA（兩角及夾邊）",ok:false,hint:"沒有角的條件。"}]}
+  ]},
+  {given:"已知：I 是 △ABC 角平分線交點（內心），ID ⊥ AB、IE ⊥ BC。　目標：證明 ID = IE。",steps:[
+    {q:"I 是 △ABC 內心，I 在 ∠B 的角平分線上，先推出什麼？",opts:[
+      {t:"I 到 AB 的距離 = I 到 BC 的距離",ok:true},{t:"I 到 AB 的距離 = I 到 AC 的距離",ok:false,hint:"這是利用 ∠A 的角平分線得出的，不是 ∠B。"},{t:"IB = IA",ok:false,hint:"角平分線性質說的是到邊的距離相等，不是到頂點。"}]},
+    {q:"ID ⊥ AB 且 IE ⊥ BC，所以 ID 和 IE 分別代表什麼？",opts:[
+      {t:"I 到 AB 和 BC 的垂直距離",ok:true},{t:"ID 和 IE 是角平分線的長度",ok:false,hint:"這兩條是垂線段，不是角平分線。"},{t:"I 到兩頂點的距離",ok:false,hint:"到頂點的距離不是這裡標記的量。"}]},
+    {q:"綜合以上，可以推出什麼？",opts:[
+      {t:"ID = IE（因為都等於 I 到邊的距離）",ok:true},{t:"∠DIB = ∠EIB",ok:false,hint:"角度關係不直接從這裡推出。"},{t:"△IDB ≅ △IEB（ASA）",ok:false,hint:"需要先確認距離相等，才能作為條件。"}]}
+  ]},
+  {given:"已知：PA = PB，QA = QB。　目標：證明 P、Q 都在 AB 的中垂線上。",steps:[
+    {q:"PA = PB，由中垂線哪個定理可推出結論？",opts:[
+      {t:"中垂線逆定理：P 在 AB 的中垂線上",ok:true},{t:"中垂線性質：PA = PB → P 是中點",ok:false,hint:"中垂線上的點不一定是中點。"},{t:"無法推出任何結論",ok:false,hint:"PA = PB 已經是中垂線逆定理的條件。"}]},
+    {q:"同理 QA = QB，可推出什麼？",opts:[
+      {t:"Q 也在 AB 的中垂線上",ok:true},{t:"Q 是 AB 的中點",ok:false,hint:"中垂線逆定理說的是 Q 在中垂線上，不一定是中點。"},{t:"QP ⊥ AB",ok:false,hint:"這個結論需要額外條件。"}]},
+    {q:"P 和 Q 都在 AB 中垂線上，意味著什麼？",opts:[
+      {t:"PQ 就在 AB 的中垂線上（兩點決定一條線）",ok:true},{t:"PQ ∥ AB",ok:false,hint:"不一定平行。"},{t:"PQ = AB",ok:false,hint:"無法推出長度相等。"}]}
+  ]}
+];
+
+function renderLevel2(){
+  clearTimer();state.screen="level2";renderHUD();
+  const steps=state.maze.steps,step=steps[state.mIdx],opts=shuffle(step.opts);
+  $stage.innerHTML=`<div class="panel">
+    <p class="prompt">🔵 證明迷宮 —— 岔路 ${state.mIdx+1}/${steps.length}</p>
+    <div class="given-box">📜 ${state.maze.given}</div>
+    <p class="prompt" style="font-size:1.02rem">${step.q}</p>
+    <div class="forks" id="forks">${opts.map((o,i)=>`<button class="fork" data-i="${i}">${o.t}</button>`).join("")}</div>
+    <div class="feedback" id="fb"></div>
+    <div class="controls"><button class="btn hidden" id="next">前進 ▶</button></div>
+  </div>`;
+  const forks=document.querySelectorAll(".fork");
+  forks.forEach(f=>f.onclick=()=>{
+    const o=opts[+f.dataset.i];
+    if(o.ok){
+      forks.forEach(x=>x.disabled=true);f.classList.add("correct");sndCorrect();
+      document.getElementById("fb").innerHTML=`<div class="verdict ok">✔ 這條路通了！</div>`;
+      document.getElementById("next").classList.remove("hidden");
+    }else{
+      f.classList.add("wrong");f.disabled=true;sndWrong();
+      document.getElementById("fb").innerHTML=`<div class="verdict no">✘ 走進死路</div><div class="why">${o.hint}</div>`;
+    }
+  });
+  document.getElementById("next").onclick=()=>{
+    state.mIdx++;
+    if(state.mIdx>=steps.length){state.shards++;state.stageIdx=3;state.bossPart=0;renderBoss();}
+    else renderLevel2();
+  };
+}
+
+/* ===== 🔴 Boss ===== */
+const BOSS_SCENARIOS=[
+  {title:"外心求距離",
+   given:"△ABC 中，O 為外心，OA = 5，求 OB = ？",
+   figFn:figCircum,
+   q1:"△ABC 外心 O 具有什麼性質？",
+   rule:"CIRCUM",
+   ruleWhy:"O 是外心（三邊中垂線交點），到三頂點距離相等，故 OA = OB = OC。",
+   q2Prompt:"由外心性質，已知 OA = 5，求 OB = ？",
+   answer:5,
+   unit:"",
+   solveHint:"外心到三頂點等距，OB = OA = 5。"},
+  {title:"內心求距離",
+   given:"△ABC 中，I 為內心，I 到 AB 的距離為 3，求 I 到 BC 的距離 = ？",
+   figFn:figIncen,
+   q1:"△ABC 內心 I 在三條角平分線上，可以推出什麼性質？",
+   rule:"ANG_PROP",
+   ruleWhy:"I 在每條角平分線上，由角平分線性質（P 在平分線上 ⟹ 到兩邊等距），知 I 到三邊距離相等（即內切圓半徑）。",
+   q2Prompt:"由此性質，I 到 AB = 3，求 I 到 BC 的距離 = ？",
+   answer:3,
+   unit:"",
+   solveHint:"角平分線性質：I 在角平分線上 ⟹ I 到三邊等距，故 I 到 BC = I 到 AB = 3。"},
+  {title:"中垂線求距離",
+   given:"P 在線段 AB 的中垂線上，PA = 10，求 PB = ？",
+   figFn:figPerpProp,
+   q1:"P 在 AB 的中垂線上，可以用哪個性質？",
+   rule:"PERP_PROP",
+   ruleWhy:"中垂線性質：中垂線上的點到線段兩端點距離相等，故 PA = PB。",
+   q2Prompt:"由中垂線性質，已知 PA = 10，求 PB = ？",
+   answer:10,
+   unit:"",
+   solveHint:"中垂線性質：P 在中垂線上 ⟹ PA = PB，故 PB = PA = 10。"}
+];
+
+function renderBoss(){
+  clearTimer();state.screen="boss";renderHUD();
+  const scn=state.boss;
+  if(state.bossPart===0){
+    $stage.innerHTML=`<div class="panel">
+      <p class="big">🔴 Boss：${scn.title}</p>
+      <div class="given-box">📜 ${scn.given}</div>
+      <div class="fig-row">${scn.figFn()}</div>
+      <p class="prompt">${scn.q1}</p>
+      ${answersHTML()}
+      <div class="feedback" id="fb"></div>
+      <div class="controls"><button class="btn hidden" id="next">下一小題 ▶</button></div>
+    </div>`;
+    document.querySelectorAll(".ans").forEach(b=>{
+      b.onclick=()=>{
+        const chosen=b.dataset.v;
+        if(chosen===scn.rule){
+          document.querySelectorAll(".ans").forEach(x=>x.disabled=true);b.classList.add("correct");sndCorrect();
+          document.getElementById("fb").innerHTML=`<div class="verdict ok">✔ ${RULE_INFO[scn.rule].zh}！</div><div class="why">${scn.ruleWhy}</div>`;
+          document.getElementById("next").classList.remove("hidden");
+        }else{
+          b.classList.add("wrong");b.disabled=true;state.errorTally[scn.rule]++;sndWrong();
+          document.getElementById("fb").innerHTML=`<div class="verdict no">✘ 再想想，答案是「${RULE_INFO[scn.rule].zh}」</div><div class="why">${scn.ruleWhy}</div>`;
+        }
+      };
+    });
+    document.getElementById("next").onclick=()=>{state.bossPart=1;renderBoss();};
+  }else{
+    $stage.innerHTML=`<div class="panel">
+      <div class="fig-row">${scn.figFn()}</div>
+      <div class="given-box">📜 ${scn.given}</div>
+      <p class="prompt">${scn.q2Prompt}</p>
+      <div><input class="numin" id="ans" type="number" placeholder="?"><span class="unit">${scn.unit}</span></div>
+      <div class="feedback" id="fb"></div>
+      <div class="controls">
+        <button class="btn" id="check">確認答案</button>
+        <button class="btn hidden" id="winbtn">完成狩獵 🏅</button>
+      </div>
+    </div>`;
+    document.getElementById("check").onclick=()=>{
+      const v=parseFloat(document.getElementById("ans").value);
+      if(v===scn.answer){
+        state.shards++;renderHUD();sndCorrect();
+        document.getElementById("fb").innerHTML=`<div class="verdict ok">✔ 答對！答案是 ${scn.answer}${scn.unit}</div><div class="why">${scn.solveHint}</div>`;
+        document.getElementById("check").classList.add("hidden");
+        document.getElementById("winbtn").classList.remove("hidden");
+      }else{
+        sndWrong();
+        document.getElementById("fb").innerHTML=`<div class="verdict no">還不對喔</div><div class="why">${scn.solveHint}</div>`;
+      }
+    };
+    document.getElementById("winbtn").onclick=renderWin;
+  }
+}
+
+/* ===== 通關場景 ===== */
+function sceneSVG(){
+  return`<svg class="scene" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1040"/><stop offset="50%" stop-color="#5a3878"/>
+      <stop offset="80%" stop-color="#c4788a"/><stop offset="100%" stop-color="#f8c89a"/>
+    </linearGradient>
+    <linearGradient id="water2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8b088"/><stop offset="100%" stop-color="#2e2254"/>
+    </linearGradient>
+    <radialGradient id="sun2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff6c0" stop-opacity=".9"/><stop offset="100%" stop-color="#fff6c0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff6d0"/><stop offset="40%" stop-color="#ffd87a"/><stop offset="100%" stop-color="#f3aa6a"/>
+    </linearGradient>
+    <linearGradient id="wood2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d49a5c"/><stop offset="100%" stop-color="#7c4a22"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="800" height="275" fill="url(#sky2)"/>
+  <circle cx="580" cy="200" r="120" fill="url(#sun2)"/><circle cx="580" cy="200" r="44" fill="#ffe9b0"/>
+  <circle cx="110" cy="50" r="1.5" fill="#fff" opacity=".7"/><circle cx="230" cy="32" r="1.2" fill="#fff" opacity=".6"/>
+  <circle cx="340" cy="72" r="1.4" fill="#fff" opacity=".5"/><circle cx="66" cy="100" r="1.3" fill="#fff" opacity=".5"/>
+  <rect x="0" y="275" width="800" height="115" fill="url(#water2)"/>
+  <ellipse cx="580" cy="292" rx="42" ry="4" fill="#ffd9a0" opacity=".5"/>
+  <ellipse cx="580" cy="312" rx="56" ry="4" fill="#ffc888" opacity=".4"/>
+  <path d="M0,362 Q400,338 800,362 L800,500 L0,500 Z" fill="#3e5c38"/>
+  <path d="M0,376 Q400,355 800,376 L800,500 L0,500 Z" fill="#334d2e"/>
+  <!-- 桌子 -->
+  <polygon points="230,372 570,372 628,412 172,412" fill="url(#wood2)" stroke="#6e3f1c" stroke-width="1.5"/>
+  <rect x="172" y="412" width="456" height="28" fill="#7c4a22"/>
+  <rect x="196" y="440" width="20" height="48" fill="#6e3f1c"/>
+  <rect x="584" y="440" width="20" height="48" fill="#6e3f1c"/>
+  <path d="M250,382 Q400,377 550,382" stroke="#8a5a2c" stroke-width="1.3" fill="none" opacity=".5"/>
+  <!-- 左花束 -->
+  <path d="M222,406 Q234,388 244,368" stroke="#3f7d3a" stroke-width="2.5" fill="none"/>
+  <path d="M236,408 Q240,388 232,366" stroke="#3f7d3a" stroke-width="2.5" fill="none"/>
+  <circle cx="235" cy="362" r="8" fill="#ff8fab"/><circle cx="235" cy="362" r="4" fill="#e85d82"/>
+  <circle cx="252" cy="370" r="7" fill="#ffa9be"/><circle cx="252" cy="370" r="3.5" fill="#e76d8e"/>
+  <circle cx="218" cy="372" r="7" fill="#ffb38a"/><circle cx="218" cy="372" r="3.5" fill="#e98a5a"/>
+  <!-- 右花瓶 -->
+  <path d="M520,408 L558,408 L552,380 L526,380 Z" fill="#bfe0ea" opacity=".85" stroke="#8fbecb" stroke-width="1.5"/>
+  <path d="M539,380 L522,355" stroke="#3f7d3a" stroke-width="2.5" fill="none"/>
+  <path d="M539,380 L539,346" stroke="#3f7d3a" stroke-width="2.5" fill="none"/>
+  <path d="M539,380 L556,358" stroke="#3f7d3a" stroke-width="2.5" fill="none"/>
+  <circle cx="521" cy="353" r="8" fill="#ff7a99"/><circle cx="521" cy="353" r="4" fill="#d64d6e"/>
+  <circle cx="539" cy="342" r="9" fill="#ff9ec0"/><circle cx="539" cy="342" r="4.5" fill="#e76d97"/>
+  <circle cx="557" cy="356" r="7" fill="#ffb38a"/><circle cx="557" cy="356" r="3.5" fill="#e98a5a"/>
+  <!-- 獎杯 -->
+  <rect x="372" y="378" width="56" height="14" rx="3" fill="#7c4a22" stroke="#5a3010" stroke-width="1"/>
+  <rect x="380" y="360" width="40" height="18" fill="url(#gold2)"/>
+  <ellipse cx="400" cy="362" rx="20" ry="6" fill="url(#gold2)" stroke="#cf9446" stroke-width="1"/>
+  <path d="M350,260 C318,262 316,308 356,316" fill="none" stroke="url(#gold2)" stroke-width="8" stroke-linecap="round"/>
+  <path d="M450,260 C482,262 484,308 444,316" fill="none" stroke="url(#gold2)" stroke-width="8" stroke-linecap="round"/>
+  <path d="M348,254 C348,312 370,358 400,358 C430,358 452,312 452,254 Z" fill="url(#gold2)" stroke="#cf9446" stroke-width="1.5"/>
+  <ellipse cx="400" cy="252" rx="52" ry="11" fill="url(#gold2)" stroke="#cf9446" stroke-width="1.5"/>
+  <ellipse cx="400" cy="251" rx="42" ry="7.5" fill="#c98040"/>
+  <!-- 玫瑰藤蔓 -->
+  <path d="M354,356 C336,330 344,292 366,266" fill="none" stroke="#3f7d3a" stroke-width="2.5"/>
+  <path d="M446,356 C464,330 456,292 434,266" fill="none" stroke="#3f7d3a" stroke-width="2.5"/>
+  <circle cx="358" cy="298" r="6" fill="#ff8fab"/><circle cx="358" cy="298" r="3" fill="#e85d82"/>
+  <circle cx="442" cy="298" r="6" fill="#ff8fab"/><circle cx="442" cy="298" r="3" fill="#e85d82"/>
+  <circle cx="362" cy="268" r="7" fill="#ffa9be"/><circle cx="362" cy="268" r="3.5" fill="#e76d8e"/>
+  <circle cx="438" cy="268" r="7" fill="#ffa9be"/><circle cx="438" cy="268" r="3.5" fill="#e76d8e"/>
+  <!-- 第一名 刻字 -->
+  <text x="401" y="316" text-anchor="middle" font-size="20" font-weight="bold" fill="#ffe6b0" opacity=".6">第一名</text>
+  <text x="400" y="315" text-anchor="middle" font-size="20" font-weight="bold" fill="#6e3f17">第一名</text>
+  <!-- 幾何圖案裝飾 -->
+  <path d="M374,280 L400,246 L426,280 Z" fill="none" stroke="#fff3c0" stroke-width="1.5" opacity=".5"/>
+  <circle cx="400" cy="270" r="12" fill="none" stroke="#fff3c0" stroke-width="1.2" opacity=".4"/>
+  </svg>`;
+}
+function fireworksHTML(n){
+  const FW=['#ff4d6d','#ffd166','#4cc9f0','#06d6a0','#c77dff','#f72585','#ffb703','#80ffdb','#ff7b00','#b5179e'];
+  let s=`<div class="fw-layer">`;
+  for(let i=0;i<n;i++){
+    const c=FW[i%FW.length];
+    const x=(8+Math.random()*80).toFixed(1),y=(5+Math.random()*40).toFixed(1),dist=(50+Math.random()*30).toFixed(0);
+    let spans="";for(let k=0;k<14;k++)spans+=`<span style="--a:${(k*360/14).toFixed(1)}deg"></span>`;
+    s+=`<div class="firework" style="left:${x}%;top:${y}%;--fc:${c};--d:-${dist}px;--dl:${(i*0.42).toFixed(2)}s">${spans}</div>`;
+  }
+  return s+`</div>`;}
+
+function renderWin(){
+  clearTimer();state.screen="win";state.stageIdx=4;renderHUD();
+  sndFireworks(state.shards);
+  const review={PERP_PROP:"複習：中垂線上的點到兩端點等距。",PERP_INV:"複習：到兩端點等距 ⟹ 在中垂線上（逆定理）。",ANG_PROP:"複習：角平分線上的點到兩邊等距。",ANG_INV:"複習：角內到兩邊等距 ⟹ 在角平分線上（逆定理）。",CIRCUM:"複習：外心到三頂點等距（外接圓半徑）。",NONE:"複習：條件不足時不能強行套用性質！"};
+  const errs=Object.entries(state.errorTally).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]);
+  const reviewHTML=errs.length===0
+    ?`<div class="review"><h3>📊 學習追蹤</h3><li>全程零失誤，六大性質完全掌握！</li></div>`
+    :`<div class="review"><h3>📊 學習追蹤：建議複習</h3>${errs.map(([r,n])=>`<li>・${RULE_INFO[r].zh}（錯 ${n} 次）：${review[r]}</li>`).join("")}</div>`;
+  $stage.innerHTML=`<div class="panel">
+    <p class="win-title">🎉 通關！你是本班的幾何神探 · 第一名 🎉</p>
+    <div class="scene-wrap">${sceneSVG()}${fireworksHTML(state.shards)}</div>
+    <p class="prompt" style="margin-top:14px">蒐集了 <strong>${state.shards}</strong> 塊碎片 🔺，為你綻放 <strong>${state.shards}</strong> 發繽紛煙火！</p>
+    ${reviewHTML}
+    <div class="controls win-actions">
+      <button class="btn" id="again">再挑戰一次 🔄</button>
+      <button class="btn ghost" id="leave">離開 🚪</button>
+    </div>
+  </div>`;
+  document.getElementById("again").onclick=()=>{newRun();renderStart();};
+  document.getElementById("leave").onclick=()=>{
+    $stage.innerHTML=`<div class="panel"><div class="badge">🌅</div><p class="big">掰掰！</p><p class="prompt">感謝遊玩《幾何神探》，帶著第一名的好心情離開吧。<br><span class="meta">（可直接關閉此分頁）</span></p><div class="controls"><button class="btn ghost" id="back">回首頁</button></div></div>`;
+    document.getElementById("back").onclick=()=>{newRun();renderStart();};
+    try{window.close();}catch(e){}
+  };
+}
+
+/* ===== 起始 / 重玩 ===== */
+function newRun(){
+  clearTimer();
+  state.shards=0;state.vIdx=0;state.mIdx=0;state.bossPart=0;state.stageIdx=0;
+  state.l1Time=60;state.l1Defeat=0;
+  state.errorTally={PERP_PROP:0,PERP_INV:0,ANG_PROP:0,ANG_INV:0,CIRCUM:0,NONE:0};
+  state.village=buildVillage();
+  state.maze=shuffle(MAZES)[0];
+  state.boss=shuffle(BOSS_SCENARIOS)[0];
+}
+function renderStart(){
+  state.screen="start";renderHUD();
+  $stage.innerHTML=`<div class="panel">
+    <p class="big">🔍 準備好了嗎？</p>
+    <p class="prompt">你將闖過 <strong>新手村 → 配對挑戰 → 證明迷宮 → Boss 會考</strong>，<br>蒐集碎片，成為「幾何神探」。</p>
+    <div class="controls"><button class="btn" id="go">開始偵查 ▶</button></div>
+  </div>`;
+  document.getElementById("go").onclick=renderVillage;
+}
+
+/* 鍵盤 */
+document.addEventListener("keydown",e=>{
+  if(e.key>="1"&&e.key<="6"){const all=document.querySelectorAll(".ans");const i=+e.key-1;if(all[i]&&!all[i].disabled)all[i].click();}
+  if((e.key==="Enter"||e.key===" ")&&document.getElementById("next")&&!document.getElementById("next").classList.contains("hidden"))document.getElementById("next").click();
+});
+
+newRun();
+renderStart();
+</script>
+</body>
+</html>
